@@ -1,0 +1,23 @@
+## Visual Studio temporary files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+bin/
+obj/
+
+# Visual Studio cache
+.vs/
+
+# NuGet Packages
+*.nupkg
+
+# Build output executables
+*.exe
+*.dll
+*.pdb
+*.deps.json
+*.runtimeconfig.json
