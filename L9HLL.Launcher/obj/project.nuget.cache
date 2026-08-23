@@ -1,28 +1,15 @@
 {
   "version": 2,
-  "dgSpecHash": "s9Ew2SFeFYAVl/mSoXLnp4LL5Osm7ZO3P/xXws2rKHuzi9/7VP8xQcFitTjxLHuHAI/q9pqOxVHZQuMcrD8jMw==",
+  "dgSpecHash": "nAhfgrPOr9c=",
   "success": true,
-  "projectFilePath": "/home/gary/l9-hll-launcher/L9HLL.Launcher/L9HLL.Launcher.csproj",
+  "projectFilePath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\gary\\l9-hll-launcher\\L9HLL.Launcher\\L9HLL.Launcher.csproj",
   "expectedPackageFiles": [
-    "/home/gary/.nuget/packages/discordrichpresence/1.2.1.24/discordrichpresence.1.2.1.24.nupkg.sha512",
-    "/home/gary/.nuget/packages/microsoft.netcore.platforms/2.0.0/microsoft.netcore.platforms.2.0.0.nupkg.sha512",
-    "/home/gary/.nuget/packages/microsoft.win32.registry/4.5.0/microsoft.win32.registry.4.5.0.nupkg.sha512",
-    "/home/gary/.nuget/packages/newtonsoft.json/13.0.1/newtonsoft.json.13.0.1.nupkg.sha512",
-    "/home/gary/.nuget/packages/system.security.accesscontrol/4.5.0/system.security.accesscontrol.4.5.0.nupkg.sha512",
-    "/home/gary/.nuget/packages/system.security.principal.windows/4.5.0/system.security.principal.windows.4.5.0.nupkg.sha512",
-    "/home/gary/.nuget/packages/microsoft.netcore.app.host.win-x64/8.0.30/microsoft.netcore.app.host.win-x64.8.0.30.nupkg.sha512"
+    "C:\\Users\\garyy\\.nuget\\packages\\discordrichpresence\\1.2.1.24\\discordrichpresence.1.2.1.24.nupkg.sha512",
+    "C:\\Users\\garyy\\.nuget\\packages\\microsoft.netcore.platforms\\2.0.0\\microsoft.netcore.platforms.2.0.0.nupkg.sha512",
+    "C:\\Users\\garyy\\.nuget\\packages\\microsoft.win32.registry\\4.5.0\\microsoft.win32.registry.4.5.0.nupkg.sha512",
+    "C:\\Users\\garyy\\.nuget\\packages\\newtonsoft.json\\13.0.1\\newtonsoft.json.13.0.1.nupkg.sha512",
+    "C:\\Users\\garyy\\.nuget\\packages\\system.security.accesscontrol\\4.5.0\\system.security.accesscontrol.4.5.0.nupkg.sha512",
+    "C:\\Users\\garyy\\.nuget\\packages\\system.security.principal.windows\\4.5.0\\system.security.principal.windows.4.5.0.nupkg.sha512"
   ],
-  "logs": [
-    {
-      "code": "NU1603",
-      "level": "Warning",
-      "warningLevel": 1,
-      "message": "L9HLL.Launcher depends on DiscordRichPresence (>= 1.2.1.16) but DiscordRichPresence 1.2.1.16 was not found. An approximate best match of DiscordRichPresence 1.2.1.24 was resolved.",
-      "libraryId": "DiscordRichPresence",
-      "targetGraphs": [
-        "net8.0-windows7.0",
-        "net8.0-windows7.0/win-x64"
-      ]
-    }
-  ]
+  "logs": []
 }

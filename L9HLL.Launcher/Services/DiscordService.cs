@@ -1,4 +1,4 @@
-using Discord;
+using DiscordRPC;
 using L9HLL.Launcher.Models;
 
 namespace L9HLL.Launcher.Services
@@ -11,7 +11,7 @@ namespace L9HLL.Launcher.Services
         public DiscordService()
         {
             _client = new DiscordRpcClient(ApplicationId);
-            _client.Initialize();
+            _client.Invoke();
             SetIdlePresence();
         }
 
@@ -20,10 +20,9 @@ namespace L9HLL.Launcher.Services
             _client.SetPresence(new RichPresence
             {
                 Details = $"Connecting to {server.Name}",
-                State = $"Server: {server.Ip}:{server.Port}",
-                Assets = new Assets { SmallImage = "l9logo" },
-                Instance = false
+                State = $"Server: {server.Ip}:{server.Port}"
             });
+            _client.UpdateSmallAsset("l9logo", "The Loyal Nine");
         }
 
         public void SetConnectedPresence(ServerStatus server)
@@ -31,10 +30,9 @@ namespace L9HLL.Launcher.Services
             _client.SetPresence(new RichPresence
             {
                 Details = $"Playing on {server.Name}",
-                State = $"Map: {server.Map} | {server.PlayerCount}/{server.MaxPlayers} players",
-                Assets = new Assets { SmallImage = "l9logo" },
-                Instance = false
+                State = $"Map: {server.Map} | {server.PlayerCount}/{server.MaxPlayers} players"
             });
+            _client.UpdateSmallAsset("l9logo", "The Loyal Nine");
         }
 
         public void SetIdlePresence()
@@ -42,10 +40,9 @@ namespace L9HLL.Launcher.Services
             _client.SetPresence(new RichPresence
             {
                 Details = "The Loyal Nine Launcher",
-                State = "Hell Let Loose",
-                Assets = new Assets { SmallImage = "l9logo" },
-                Instance = false
+                State = "Hell Let Loose"
             });
+            _client.UpdateSmallAsset("l9logo", "The Loyal Nine");
         }
 
         public void ClearPresence()

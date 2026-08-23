@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "/home/gary/l9-hll-launcher/L9HLL.Launcher/L9HLL.Launcher.csproj": {}
+    "\\\\wsl.localhost\\Ubuntu-24.04\\home\\gary\\l9-hll-launcher\\L9HLL.Launcher\\L9HLL.Launcher.csproj": {}
   },
   "projects": {
-    "/home/gary/l9-hll-launcher/L9HLL.Launcher/L9HLL.Launcher.csproj": {
+    "\\\\wsl.localhost\\Ubuntu-24.04\\home\\gary\\l9-hll-launcher\\L9HLL.Launcher\\L9HLL.Launcher.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/home/gary/l9-hll-launcher/L9HLL.Launcher/L9HLL.Launcher.csproj",
+        "projectUniqueName": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\gary\\l9-hll-launcher\\L9HLL.Launcher\\L9HLL.Launcher.csproj",
         "projectName": "L9HLL.Launcher",
-        "projectPath": "/home/gary/l9-hll-launcher/L9HLL.Launcher/L9HLL.Launcher.csproj",
-        "packagesPath": "/home/gary/.nuget/packages/",
-        "outputPath": "/home/gary/l9-hll-launcher/L9HLL.Launcher/obj/",
+        "projectPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\gary\\l9-hll-launcher\\L9HLL.Launcher\\L9HLL.Launcher.csproj",
+        "packagesPath": "C:\\Users\\garyy\\.nuget\\packages\\",
+        "outputPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\gary\\l9-hll-launcher\\L9HLL.Launcher\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/home/gary/.nuget/NuGet/NuGet.Config"
+          "C:\\Users\\garyy\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0-windows"
@@ -32,6 +32,11 @@
           "warnAsError": [
             "NU1605"
           ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
         }
       },
       "frameworks": {
@@ -40,7 +45,7 @@
           "dependencies": {
             "DiscordRichPresence": {
               "target": "Package",
-              "version": "[1.2.1.16, )"
+              "version": "[1.2.1.24, )"
             }
           },
           "imports": [
@@ -54,23 +59,15 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.NETCore.App.Host.win-x64",
-              "version": "[8.0.30, 8.0.30]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
+            },
+            "Microsoft.WindowsDesktop.App.WPF": {
+              "privateAssets": "none"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/lib/dotnet/sdk/8.0.130/PortableRuntimeIdentifierGraph.json"
-        }
-      },
-      "runtimes": {
-        "win-x64": {
-          "#import": []
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.424/PortableRuntimeIdentifierGraph.json"
         }
       }
     }
