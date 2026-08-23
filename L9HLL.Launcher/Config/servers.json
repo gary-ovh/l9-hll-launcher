@@ -1,0 +1,14 @@
+{
+  "servers": [
+    {
+      "name": "[L9] The Loyal Nine |#1|",
+      "ip": "40.27.41.16",
+      "port": 7777
+    },
+    {
+      "name": "[L9] The Loyal Nine |#2|",
+      "ip": "40.27.41.9",
+      "port": 7777
+    }
+  ]
+}

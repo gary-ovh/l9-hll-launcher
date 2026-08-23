@@ -1,0 +1,67 @@
+{
+  "format": 1,
+  "restore": {
+    "/home/gary/l9-hll-launcher/L9HLL.Launcher/L9HLL.Launcher.csproj": {}
+  },
+  "projects": {
+    "/home/gary/l9-hll-launcher/L9HLL.Launcher/L9HLL.Launcher.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/gary/l9-hll-launcher/L9HLL.Launcher/L9HLL.Launcher.csproj",
+        "projectName": "L9HLL.Launcher",
+        "projectPath": "/home/gary/l9-hll-launcher/L9HLL.Launcher/L9HLL.Launcher.csproj",
+        "packagesPath": "/home/gary/.nuget/packages/",
+        "outputPath": "/home/gary/l9-hll-launcher/L9HLL.Launcher/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/gary/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0-windows"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0-windows7.0": {
+            "targetAlias": "net8.0-windows",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
+          "dependencies": {
+            "DiscordRichPresence": {
+              "target": "Package",
+              "version": "[1.2.1.16, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/lib/dotnet/sdk/8.0.130/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}
