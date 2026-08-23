@@ -35,8 +35,9 @@ namespace L9HLL.Launcher
             }
         }
 
-        public string[] GameOptions { get; } = { "All", "HLL", "Vietnam" };
+        public string[] GameOptions { get; } = { "All", "WW2", "Vietnam" };
 
+        private List<ServerInfo> _serverInfos = new();
         private List<ServerStatus> _allServers = new();
         public ObservableCollection<ServerStatus> Servers { get; } = new();
         public ICommand LaunchCommand { get; }
@@ -67,9 +68,11 @@ namespace L9HLL.Launcher
                 return;
             }
 
+            _serverInfos.Clear();
             _allServers.Clear();
             foreach (var server in serverInfos)
             {
+                _serverInfos.Add(server);
                 var status = new ServerStatus
                 {
                     Name = server.Name,
@@ -90,10 +93,15 @@ namespace L9HLL.Launcher
             {
                 Servers.Clear();
                 var game = _selectedGame.ToLower();
+                var internalGame = game switch
+                {
+                    "ww2" => "hll",
+                    _ => game
+                };
                 var filtered = _allServers.Where(s =>
                     game == "all" ||
-                    (game == "hll" && s.Game == "hll") ||
-                    (game == "vietnam" && s.Game == "vietnam")
+                    (internalGame == "hll" && s.Game == "hll") ||
+                    (internalGame == "vietnam" && s.Game == "vietnam")
                 ).ToList();
 
                 foreach (var server in filtered)
@@ -107,15 +115,7 @@ namespace L9HLL.Launcher
             {
                 StatusText = "Querying servers...";
 
-                var serverInfos = _allServers.Select(s => new ServerInfo
-                {
-                    Name = s.Name,
-                    Ip = s.Ip,
-                    Port = s.Port,
-                    Game = s.Game
-                }).ToList();
-
-                var tasks = serverInfos.Select(s => _queryService.QueryAsync(s));
+                var tasks = _serverInfos.Select(s => _queryService.QueryAsync(s));
                 var results = await Task.WhenAll(tasks).ConfigureAwait(false);
 
                 _dispatcher.BeginInvoke((Action)(() =>

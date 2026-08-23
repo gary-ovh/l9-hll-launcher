@@ -1,23 +1,33 @@
-## Visual Studio temporary files
-*.rsuser
-*.suo
+## Visual Studio
 *.user
+*.suo
 *.userosscache
 *.sln.docstates
+.vs/
 
-# Build results
+## Build results
 bin/
 obj/
 
-# Visual Studio cache
-.vs/
-
-# NuGet Packages
+## NuGet Packages
 *.nupkg
 
-# Build output executables
+## Build output executables
 *.exe
 *.dll
 *.pdb
 *.deps.json
 *.runtimeconfig.json
+
+## ZIP archives (distributable builds)
+*.zip
+
+## Debug logs
+debug.log
+config_debug.log
+
+## Discord SDK native (downloaded separately)
+discord_game_sdk.dll
+
+## Discord logo for upload
+l9-logo-*.png

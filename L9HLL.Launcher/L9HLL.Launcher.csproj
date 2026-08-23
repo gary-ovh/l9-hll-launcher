@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <Resource Include="Assets\L9_Logo_small.png" />
+    <Resource Include="Assets\background.jpg" />
   </ItemGroup>
 
   <ItemGroup>

@@ -11,108 +11,102 @@
     <WindowChrome.WindowChrome>
         <WindowChrome GlassFrameThickness="0" CaptionHeight="0" CornerRadius="8"/>
     </WindowChrome.WindowChrome>
-    <Border Background="#1a1a1a" CornerRadius="8">
+
+    <Border x:Name="RootBorder" CornerRadius="8" PreviewMouseLeftButtonDown="RootBorder_PreviewMouseLeftButtonDown">
         <Border.Effect>
             <DropShadowEffect ShadowDepth="8" BlurRadius="20" Opacity="0.5"/>
         </Border.Effect>
-        <Grid Margin="24">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="16"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="16"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Grid.RowSpan="6" Opacity="0.3">
-                <Border.Effect>
-                    <BlurEffect Radius="8"/>
-                </Border.Effect>
-                <Image Source="pack://application:,,,/L9HLL.Launcher;component/Assets/background.jpg"
-                       Stretch="UniformToFill"
-                       Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Border}}"
-                       Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Border}}"/>
-            </Border>
+        <Grid>
+            <!-- Background image -->
+            <Image Source="pack://application:,,,/L9HLL.Launcher;component/assets/background.jpg"
+                   Stretch="UniformToFill"
+                   HorizontalAlignment="Stretch"
+                   VerticalAlignment="Stretch"/>
 
-            <Grid Grid.Row="0" Grid.RowSpan="6">
-                <Rectangle Opacity="0.6" Fill="Black"/>
-            </Grid>
+            <!-- Dark overlay -->
+            <Rectangle Fill="#000000" Opacity="0.7"/>
 
-            <StackPanel Grid.Row="0" HorizontalAlignment="Center">
-                <Image Source="pack://application:,,,/L9HLL.Launcher;component/Assets/L9_Logo_small.png"
-                       Width="100" Height="96"
-                       Stretch="Uniform"
-                       Margin="0,0,0,6"/>
-                <TextBlock Text="HELL LET LOOSE"
-                           FontSize="13" FontWeight="SemiBold"
-                           Foreground="#8a9a5b"
-                           HorizontalAlignment="Center"
-                           Margin="0,0,0,2"/>
-                <TextBlock Text="[L9] THE LOYAL NINE"
-                           FontSize="11" FontWeight="Normal"
-                           Foreground="#777"
-                           HorizontalAlignment="Center"/>
-            </StackPanel>
+            <!-- Content -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="24,24,24,12">
+                <StackPanel HorizontalAlignment="Center">
+                    <Image Source="pack://application:,,,/L9HLL.Launcher;component/assets/l9_logo_small.png"
+                           Width="100" Height="96"
+                           Stretch="Uniform"
+                           Margin="0,0,0,6"/>
+                    <TextBlock Text="HELL LET LOOSE"
+                               FontSize="13" FontWeight="SemiBold"
+                               Foreground="#8a9a5b"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,2"/>
+                    <TextBlock Text="[L9] THE LOYAL NINE"
+                               FontSize="11" FontWeight="Normal"
+                               Foreground="#777"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,16"/>
 
-            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
-                <TextBlock Text="Game:" FontSize="12" Foreground="#aaa" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                <ComboBox x:Name="GameSelector"
-                          SelectedValue="{Binding SelectedGame}"
-                          ItemsSource="{Binding GameOptions}"
-                          Width="160"
-                          Style="{StaticResource GameCombo}"
-                          VerticalAlignment="Center"/>
-            </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,16">
+                        <TextBlock Text="Game:" FontSize="12" Foreground="#aaa" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox x:Name="GameSelector"
+                                  SelectedValue="{Binding SelectedGame}"
+                                  ItemsSource="{Binding GameOptions}"
+                                  Width="160"
+                                  Style="{StaticResource GameCombo}"
+                                  VerticalAlignment="Center"/>
+                    </StackPanel>
 
-            <ItemsControl Grid.Row="3" ItemsSource="{Binding Servers}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Style="{StaticResource ServerCard}" Margin="0,0,0,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
+                    <ItemsControl ItemsSource="{Binding Servers}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource ServerCard}" Margin="0,0,0,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
 
-                                <Border Width="10" Height="10" Grid.Column="0"
-                                        Background="{Binding IsOnline, Converter={StaticResource BoolToColor}}"
-                                        CornerRadius="5"
-                                        Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                        <Border Width="10" Height="10" Grid.Column="0"
+                                                Background="{Binding IsOnline, Converter={StaticResource BoolToColor}}"
+                                                CornerRadius="5"
+                                                Margin="12,0,0,0" VerticalAlignment="Center"/>
 
-                                <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Name}"
-                                               FontSize="13" FontWeight="SemiBold"
-                                               Foreground="#e0e0e0"/>
-                                    <TextBlock FontSize="10" Foreground="#888" Margin="0,3,0,0">
-                                        <Run Text="Map: "/>
-                                        <Run Text="{Binding Map}" Foreground="#aaa"/>
-                                    </TextBlock>
-                                    <TextBlock FontSize="10" Foreground="#888">
-                                        <Run Text="Players: "/>
-                                        <Run Text="{Binding PlayerCount}" Foreground="#aaa"/>
-                                        <Run Text="/"/>
-                                        <Run Text="{Binding MaxPlayers}" Foreground="#aaa"/>
-                                    </TextBlock>
-                                </StackPanel>
+                                        <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontSize="13" FontWeight="SemiBold"
+                                                       Foreground="#e0e0e0"/>
+                                            <TextBlock FontSize="10" Foreground="#888" Margin="0,3,0,0">
+                                                <Run Text="Map: "/>
+                                                <Run Text="{Binding Map}" Foreground="#aaa"/>
+                                            </TextBlock>
+                                            <TextBlock FontSize="10" Foreground="#888">
+                                                <Run Text="Players: "/>
+                                                <Run Text="{Binding PlayerCount}" Foreground="#aaa"/>
+                                                <Run Text="/"/>
+                                                <Run Text="{Binding MaxPlayers}" Foreground="#aaa"/>
+                                            </TextBlock>
+                                        </StackPanel>
 
-                                <Button Grid.Column="2"
-                                        Content="JOIN"
-                                        Style="{StaticResource JoinButton}"
-                                        Command="{Binding DataContext.LaunchCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                        CommandParameter="{Binding}"/>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                                        <Button Grid.Column="2"
+                                                Content="JOIN"
+                                                Style="{StaticResource JoinButton}"
+                                                Command="{Binding DataContext.LaunchCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
 
-            <TextBlock Grid.Row="5"
-                       Text="{Binding StatusText}"
+            <!-- Status bar -->
+            <TextBlock Text="{Binding StatusText}"
                        FontSize="10"
                        Foreground="#555"
-                       HorizontalAlignment="Center"/>
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Bottom"
+                       Margin="0,0,0,8"/>
         </Grid>
     </Border>
 </Window>

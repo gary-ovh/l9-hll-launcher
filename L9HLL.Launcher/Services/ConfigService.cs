@@ -29,7 +29,8 @@ namespace L9HLL.Launcher.Services
             return new List<ServerInfo>
             {
                 new ServerInfo { Name = "[L9] The Loyal Nine |#1|", Ip = "40.27.41.16", Port = 7777, Game = "hll" },
-                new ServerInfo { Name = "[L9] The Loyal Nine |#2|", Ip = "40.27.41.9", Port = 7777, Game = "hll" }
+                new ServerInfo { Name = "[L9] The Loyal Nine |#2|", Ip = "40.27.41.9", Port = 7777, Game = "hll" },
+                new ServerInfo { Name = "[L9] The Loyal Nine |#1| Vietnam", Ip = "69.162.103.77", Port = 7777, QueryPort = 7778, Game = "vietnam" }
             };
         }
 

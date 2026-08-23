@@ -10,6 +10,8 @@ namespace L9HLL.Launcher.Models
         public string Ip { get; set; } = string.Empty;
         [JsonPropertyName("port")]
         public int Port { get; set; }
+        [JsonPropertyName("queryPort")]
+        public int? QueryPort { get; set; }
         [JsonPropertyName("game")]
         public string Game { get; set; } = "hll";
     }
