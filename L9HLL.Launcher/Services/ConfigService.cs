@@ -11,18 +11,28 @@ namespace L9HLL.Launcher.Services
     {
         public List<ServerInfo> LoadServers()
         {
-            var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config", "servers.json");
+            var exePath = Environment.ProcessPath ?? "";
+            var exeDir = Path.GetDirectoryName(exePath) ?? AppDomain.CurrentDomain.BaseDirectory;
+            var configPath = Path.Combine(exeDir, "Config", "servers.json");
 
             try
             {
-                var json = File.ReadAllText(configPath);
-                var config = JsonSerializer.Deserialize<ServerConfig>(json);
-                return config?.Servers ?? new List<ServerInfo>();
+                if (File.Exists(configPath))
+                {
+                    var json = File.ReadAllText(configPath);
+                    var config = JsonSerializer.Deserialize<ServerConfig>(json);
+                    return config?.Servers ?? new List<ServerInfo>();
+                }
             }
             catch
             {
-                return new List<ServerInfo>();
             }
+
+            return new List<ServerInfo>
+            {
+                new ServerInfo { Name = "[L9] The Loyal Nine |#1|", Ip = "40.27.41.16", Port = 7777 },
+                new ServerInfo { Name = "[L9] The Loyal Nine |#2|", Ip = "40.27.41.9", Port = 7777 }
+            };
         }
 
         private class ServerConfig

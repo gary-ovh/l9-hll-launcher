@@ -1,38 +1,58 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using L9HLL.Launcher.Models;
 using L9HLL.Launcher.Services;
 
 namespace L9HLL.Launcher
 {
-    public class MainViewModel
+    public class MainViewModel : INotifyPropertyChanged
     {
         private readonly ServerQueryService _queryService = new();
         private readonly ConfigService _configService = new();
         private readonly LaunchService _launchService = new();
         private DiscordService? _discordService;
         private Timer? _refreshTimer;
+        private readonly Dispatcher _dispatcher;
 
         public ObservableCollection<ServerStatus> Servers { get; } = new();
         public ICommand LaunchCommand { get; }
-        public string StatusText { get; set; } = "Loading servers...";
+        public string StatusText
+        {
+            get => _statusText;
+            set { _statusText = value; OnPropertyChanged(); }
+        }
+        private string _statusText = "Loading...";
 
         public MainViewModel()
         {
+            _dispatcher = Application.Current.Dispatcher;
             _discordService = new DiscordService();
             LaunchCommand = new RelayCommand<ServerStatus>(OnLaunch);
             LoadAndRefresh();
-            _refreshTimer = new Timer(OnRefresh, null, 15000, 15000);
+            _refreshTimer = new Timer(OnRefresh, null, 10000, 10000);
         }
 
         private void LoadAndRefresh()
         {
-            var servers = _configService.LoadServers();
-            foreach (var server in servers)
+            var serverInfos = _configService.LoadServers();
+            StatusText = $"Loaded {serverInfos.Count} server(s)";
+
+            if (serverInfos.Count == 0)
+            {
+                StatusText = "No servers found in config!";
+                return;
+            }
+
+            foreach (var server in serverInfos)
             {
                 Servers.Add(new ServerStatus
                 {
@@ -46,25 +66,45 @@ namespace L9HLL.Launcher
 
         private async void RefreshAll()
         {
-            var tasks = Servers.Select(s => _queryService.QueryAsync(new ServerInfo
+            try
             {
-                Name = s.Name,
-                Ip = s.Ip,
-                Port = s.Port
-            }));
+                StatusText = "Querying servers...";
 
-            var results = await Task.WhenAll(tasks);
+                var serverInfos = Servers.Select(s => new ServerInfo
+                {
+                    Name = s.Name,
+                    Ip = s.Ip,
+                    Port = s.Port
+                }).ToList();
 
-            foreach (var (result, original) in results.Zip(Servers, (r, o) => (r, o)))
-            {
-                original.IsOnline = result.IsOnline;
-                original.PlayerCount = result.PlayerCount;
-                original.MaxPlayers = result.MaxPlayers;
-                original.Map = result.Map;
-                original.Ping = result.Ping;
+                var tasks = serverInfos.Select(s => _queryService.QueryAsync(s));
+                var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+
+                _dispatcher.BeginInvoke((Action)(() =>
+                {
+                    var onlineCount = 0;
+
+                    for (int i = 0; i < Servers.Count && i < results.Length; i++)
+                    {
+                        var result = results[i].status;
+                        var original = Servers[i];
+
+                        original.IsOnline = result.IsOnline;
+                        original.PlayerCount = result.PlayerCount;
+                        original.MaxPlayers = result.MaxPlayers;
+                        original.Map = result.Map;
+
+                        if (result.IsOnline)
+                            onlineCount++;
+                    }
+
+                    StatusText = $"{DateTime.Now:HH:mm:ss} | {onlineCount}/{results.Length} online";
+                }));
             }
-
-            StatusText = $"Updated {DateTime.Now:HH:mm:ss}";
+            catch (Exception ex)
+            {
+                StatusText = $"Error: {ex.Message}";
+            }
         }
 
         private void OnLaunch(ServerStatus? server)
@@ -72,13 +112,20 @@ namespace L9HLL.Launcher
             if (server == null) return;
 
             _discordService?.SetConnectingPresence(server);
-            StatusText = $"Launching {server.Name}...";
+            StatusText = $"Connecting to {server.Name}...";
             _launchService.LaunchServer(server);
         }
 
         private void OnRefresh(object? state)
         {
             Task.Run(RefreshAll);
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 

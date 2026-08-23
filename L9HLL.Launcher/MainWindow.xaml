@@ -16,7 +16,7 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" HorizontalAlignment="Center">
-            <Image Source="/Assets/L9_Logo_small.png"
+            <Image Source="pack://application:,,,/L9HLL.Launcher;component/Assets/L9_Logo_small.png"
                    Width="120" Height="115"
                    Stretch="Uniform"
                    Margin="0,0,0,8"/>
@@ -60,9 +60,6 @@
                                     <Run Text="{Binding PlayerCount}" Foreground="#aaa"/>
                                     <Run Text="/"/>
                                     <Run Text="{Binding MaxPlayers}" Foreground="#aaa"/>
-                                    <Run Text="  |  Ping: "/>
-                                    <Run Text="{Binding Ping}" Foreground="#aaa"/>
-                                    <Run Text="ms"/>
                                 </TextBlock>
                             </StackPanel>
 
