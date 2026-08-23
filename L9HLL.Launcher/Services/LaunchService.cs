@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using Microsoft.Win32;
 using L9HLL.Launcher.Models;
 
 namespace L9HLL.Launcher.Services
@@ -10,14 +11,46 @@ namespace L9HLL.Launcher.Services
 
         public void LaunchServer(ServerStatus server)
         {
-            var connectArg = $"-connect\\{server.Ip}:{server.Port}/-skipintro";
-            var steamUri = $"steam://run/{HLL_AppId}/{connectArg}";
+            var steamPath = FindSteamPath();
 
-            Process.Start(new ProcessStartInfo
+            if (!string.IsNullOrEmpty(steamPath))
             {
-                FileName = steamUri,
-                UseShellExecute = true
-            });
+                var connectArg = $"-connect {server.Ip}:{server.Port} -skipintro";
+                var steamCmd = $"-applaunch {HLL_AppId} {connectArg}";
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = steamPath,
+                    Arguments = steamCmd,
+                    UseShellExecute = true
+                });
+            }
+            else
+            {
+                var connectArg = $"-connect\\{server.Ip}:{server.Port}/-skipintro";
+                var steamUri = $"steam://run/{HLL_AppId}/{connectArg}";
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = steamUri,
+                    UseShellExecute = true
+                });
+            }
+        }
+
+        private static string? FindSteamPath()
+        {
+            var installPath = (string?)Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Valve\Steam", "InstallPath", null)
+                           ?? (string?)Registry.GetValue(@"HKEY_CURRENT_USER\SOFTWARE\Valve\Steam", "InstallPath", null);
+
+            if (!string.IsNullOrEmpty(installPath))
+            {
+                var steamExe = Path.Combine(installPath, "Steam.exe");
+                if (File.Exists(steamExe))
+                    return steamExe;
+            }
+
+            return null;
         }
     }
 }
