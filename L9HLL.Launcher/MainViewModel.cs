@@ -23,6 +23,21 @@ namespace L9HLL.Launcher
         private Timer? _refreshTimer;
         private readonly Dispatcher _dispatcher;
 
+        private string _selectedGame = "all";
+        public string SelectedGame
+        {
+            get => _selectedGame;
+            set
+            {
+                _selectedGame = value;
+                OnPropertyChanged();
+                FilterServers();
+            }
+        }
+
+        public string[] GameOptions { get; } = { "All", "HLL", "Vietnam" };
+
+        private List<ServerStatus> _allServers = new();
         public ObservableCollection<ServerStatus> Servers { get; } = new();
         public ICommand LaunchCommand { get; }
         public string StatusText
@@ -52,16 +67,38 @@ namespace L9HLL.Launcher
                 return;
             }
 
+            _allServers.Clear();
             foreach (var server in serverInfos)
             {
-                Servers.Add(new ServerStatus
+                var status = new ServerStatus
                 {
                     Name = server.Name,
                     Ip = server.Ip,
-                    Port = server.Port
-                });
+                    Port = server.Port,
+                    Game = server.Game
+                };
+                _allServers.Add(status);
             }
+
+            FilterServers();
             Task.Run(RefreshAll);
+        }
+
+        private void FilterServers()
+        {
+            _dispatcher.Invoke(() =>
+            {
+                Servers.Clear();
+                var game = _selectedGame.ToLower();
+                var filtered = _allServers.Where(s =>
+                    game == "all" ||
+                    (game == "hll" && s.Game == "hll") ||
+                    (game == "vietnam" && s.Game == "vietnam")
+                ).ToList();
+
+                foreach (var server in filtered)
+                    Servers.Add(server);
+            });
         }
 
         private async void RefreshAll()
@@ -70,11 +107,12 @@ namespace L9HLL.Launcher
             {
                 StatusText = "Querying servers...";
 
-                var serverInfos = Servers.Select(s => new ServerInfo
+                var serverInfos = _allServers.Select(s => new ServerInfo
                 {
                     Name = s.Name,
                     Ip = s.Ip,
-                    Port = s.Port
+                    Port = s.Port,
+                    Game = s.Game
                 }).ToList();
 
                 var tasks = serverInfos.Select(s => _queryService.QueryAsync(s));
@@ -84,10 +122,10 @@ namespace L9HLL.Launcher
                 {
                     var onlineCount = 0;
 
-                    for (int i = 0; i < Servers.Count && i < results.Length; i++)
+                    for (int i = 0; i < _allServers.Count && i < results.Length; i++)
                     {
                         var result = results[i].status;
-                        var original = Servers[i];
+                        var original = _allServers[i];
 
                         original.IsOnline = result.IsOnline;
                         original.PlayerCount = result.PlayerCount;

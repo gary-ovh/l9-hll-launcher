@@ -11,6 +11,7 @@ namespace L9HLL.Launcher.Services
     public class LaunchService
     {
         private const int HLL_AppId = 686810;
+        private const int Vietnam_AppId = 3079210;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct INPUT
@@ -64,7 +65,6 @@ namespace L9HLL.Launcher.Services
         private const int VK_SPACE = 0x20;
         private const int VK_RETURN = 0x0D;
         private const int VK_ESCAPE = 0x1B;
-        private const int VK_F1 = 0x70;
 
         [DllImport("user32.dll")]
         private static extern uint SendInput(uint nInputs, ref INPUT pInputs, int cbSize);
@@ -93,60 +93,54 @@ namespace L9HLL.Launcher.Services
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
-        [DllImport("user32.dll")]
-        private static extern bool SetActiveWindow(IntPtr hWnd);
-
-        [DllImport("user32.dll")]
-        private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, IntPtr dwExtraInfo);
-
         public async void LaunchServer(ServerStatus server)
         {
             var steamPath = FindSteamPath();
+            bool isVietnam = server.Game == "vietnam";
 
             if (!string.IsNullOrEmpty(steamPath))
             {
+                int appId = isVietnam ? Vietnam_AppId : HLL_AppId;
+                string cmd = isVietnam ? "open" : "+connect";
+
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = steamPath,
-                    Arguments = $"-applaunch {HLL_AppId} \"+connect {server.Ip}:{server.Port}\"",
+                    Arguments = $"-applaunch {appId} \"{cmd} {server.Ip}:{server.Port}\"",
                     UseShellExecute = true
                 });
             }
             else
             {
-                var gamePath = FindGamePath();
+                var gamePath = FindGamePath(isVietnam);
                 if (!string.IsNullOrEmpty(gamePath))
                 {
+                    string cmd = isVietnam ? "open" : "+connect";
                     Process.Start(new ProcessStartInfo
                     {
                         FileName = gamePath,
-                        Arguments = $"+connect {server.Ip}:{server.Port}",
+                        Arguments = $"{cmd} {server.Ip}:{server.Port}",
                         UseShellExecute = true
                     });
                 }
             }
 
-            await AutoPressConnect();
+            await AutoPressConnect(isVietnam);
         }
 
-        private async Task AutoPressConnect()
+        private async Task AutoPressConnect(bool isVietnam)
         {
-            // Wait at least 15 seconds for game to launch through Steam
             for (int i = 0; i < 15; i++)
-            {
                 await Task.Delay(1000);
-            }
 
-            // Now poll for the game window and send keys
             for (int i = 0; i < 90; i++)
             {
-                var gameWindow = FindGameWindow();
+                var gameWindow = FindGameWindow(isVietnam);
                 if (gameWindow != IntPtr.Zero && IsWindow(gameWindow))
                 {
                     SetForegroundWindow(gameWindow);
                     await Task.Delay(1000);
 
-                    // Send multiple keys with longer pauses
                     for (int j = 0; j < 5; j++)
                     {
                         SendKeyboardInput(VK_SPACE);
@@ -184,42 +178,35 @@ namespace L9HLL.Launcher.Services
             SendInput(1, ref inputUp, Marshal.SizeOf(typeof(INPUT)));
         }
 
-        private IntPtr FindGameWindow()
+        private IntPtr FindGameWindow(bool isVietnam)
         {
             try
             {
-                var processes = Process.GetProcessesByName("HLL");
-                foreach (var proc in processes)
+                string[] processNames = isVietnam
+                    ? new[] { "HLLVietnam-Win64-Shipping", "HLLVietnam" }
+                    : new[] { "HLL-Win64-Shipping", "HLL" };
+
+                foreach (var procName in processNames)
                 {
-                    if (proc.MainWindowHandle != IntPtr.Zero && IsWindow(proc.MainWindowHandle))
+                    var processes = Process.GetProcessesByName(procName);
+                    foreach (var proc in processes)
                     {
-                        return proc.MainWindowHandle;
+                        if (proc.MainWindowHandle != IntPtr.Zero && IsWindow(proc.MainWindowHandle))
+                            return proc.MainWindowHandle;
                     }
                 }
             }
             catch { }
 
-            try
-            {
-                var launchProcesses = Process.GetProcessesByName("Launch_HLL");
-                foreach (var proc in launchProcesses)
-                {
-                    if (proc.MainWindowHandle != IntPtr.Zero && IsWindow(proc.MainWindowHandle))
-                    {
-                        return proc.MainWindowHandle;
-                    }
-                }
-            }
-            catch { }
-
-            var hllWindow = FindWindow(null, "Hell Let Loose");
+            var windowName = isVietnam ? "Hell Let Loose - Vietnam" : "Hell Let Loose";
+            var hllWindow = FindWindow(null, windowName);
             if (hllWindow != IntPtr.Zero)
                 return hllWindow;
 
             return IntPtr.Zero;
         }
 
-        private static string? FindGamePath()
+        private static string? FindGamePath(bool isVietnam)
         {
             var keys = new[]
             {
@@ -238,7 +225,10 @@ namespace L9HLL.Launcher.Services
                     {
                         using var sub = root.OpenSubKey(subKey);
                         var displayName = sub?.GetValue("DisplayName") as string;
-                        if (displayName == null || !displayName.Contains("Hell Let Loose")) continue;
+                        if (displayName == null) continue;
+
+                        if (isVietnam && !displayName.Contains("Vietnam")) continue;
+                        if (!isVietnam && !displayName.Contains("Hell Let Loose")) continue;
 
                         var installPath = sub.GetValue("InstallLocation") as string
                                         ?? sub.GetValue("InstallPath") as string;
@@ -246,7 +236,7 @@ namespace L9HLL.Launcher.Services
                         if (!string.IsNullOrEmpty(installPath))
                         {
                             var trimmed = installPath.TrimEnd('\\');
-                            var gameExe = Path.Combine(trimmed, "Hell Let Loose.exe");
+                            var gameExe = Path.Combine(trimmed, isVietnam ? "HLLVietnam.exe" : "Hell Let Loose.exe");
                             if (File.Exists(gameExe))
                                 return gameExe;
                         }

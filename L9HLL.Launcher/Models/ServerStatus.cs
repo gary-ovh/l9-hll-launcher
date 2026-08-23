@@ -12,6 +12,7 @@ namespace L9HLL.Launcher.Models
         private int _playerCount;
         private int _maxPlayers;
         private string _map = string.Empty;
+        private string _game = "hll";
 
         public string Name
         {
@@ -47,6 +48,11 @@ namespace L9HLL.Launcher.Models
         {
             get => _map;
             set { _map = value; OnPropertyChanged(); }
+        }
+        public string Game
+        {
+            get => _game;
+            set { _game = value; OnPropertyChanged(); }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
