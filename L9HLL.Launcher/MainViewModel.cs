@@ -15,28 +15,82 @@ using L9HLL.Launcher.Services;
 
 namespace L9HLL.Launcher
 {
-    public class MainViewModel : INotifyPropertyChanged
+    public class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         private readonly ServerQueryService _queryService = new();
         private readonly ConfigService _configService = new();
         private readonly LaunchService _launchService = new();
-        public ServerQueryService QueryService => _queryService;
-        public LaunchService LaunchService => _launchService;
         private DiscordService? _discordService;
         private Timer? _refreshTimer;
         private readonly Dispatcher _dispatcher;
         private AutoLaunchService? _autoLaunchService;
+        private UpdateService? _updateService;
+
+        public ConfigService ConfigService => _configService;
+        public ServerQueryService QueryService => _queryService;
+        public LaunchService LaunchService => _launchService;
+        public UpdateService? UpdateService => _updateService;
+        public AutoLaunchService? AutoLaunchService => _autoLaunchService;
+
+        public bool StartupOnBoot
+        {
+            get => _configService.LoadSettings().StartupOnBoot;
+            set { var s = _configService.LoadSettings(); s.StartupOnBoot = value; _configService.SaveSettings(s); OnPropertyChanged(); }
+        }
+
+        public bool StartMinimized
+        {
+            get => _configService.LoadSettings().StartMinimized;
+            set { var s = _configService.LoadSettings(); s.StartMinimized = value; _configService.SaveSettings(s); OnPropertyChanged(); }
+        }
+
+        public bool CheckUpdates
+        {
+            get => _configService.LoadSettings().CheckUpdates;
+            set { var s = _configService.LoadSettings(); s.CheckUpdates = value; _configService.SaveSettings(s); OnPropertyChanged(); }
+        }
+
+        public bool AutoLaunchEnabled
+        {
+            get => _autoLaunchService?.Enabled ?? false;
+            set
+            {
+                if (_autoLaunchService != null)
+                {
+                    _autoLaunchService.Enabled = value;
+                    _autoLaunchService.ResetTrigger();
+                }
+                OnPropertyChanged();
+            }
+        }
+
+        public string AutoLaunchTime
+        {
+            get
+            {
+                if (_autoLaunchService == null || !_autoLaunchService.Enabled) return "Not set";
+                return _autoLaunchService.ScheduledTime.ToString(@"hh\:mm");
+            }
+        }
+
+        public string AutoLaunchButtonText
+        {
+            get
+            {
+                if (_autoLaunchService == null) return "Auto-Launch: Off";
+                if (!_autoLaunchService.Enabled) return "Auto-Launch: Off";
+                return $"Auto-Launch: {_autoLaunchService.ScheduledTime:hh\\:mm}";
+            }
+        }
+
+        public ICommand ToggleAutoLaunchCommand { get; }
+        public ICommand ToggleSettingsCommand { get; }
 
         private string _selectedGame = "all";
         public string SelectedGame
         {
             get => _selectedGame;
-            set
-            {
-                _selectedGame = value;
-                OnPropertyChanged();
-                FilterServers();
-            }
+            set { _selectedGame = value; OnPropertyChanged(); FilterServers(); }
         }
 
         public string[] GameOptions { get; } = { "All", "WW2", "Vietnam" };
@@ -53,29 +107,83 @@ namespace L9HLL.Launcher
         }
         private string _statusText = "Loading...";
 
-        public string AutoLaunchButtonText
-        {
-            get
-            {
-                if (_autoLaunchService == null) return "Auto-Launch: Off";
-                if (!_autoLaunchService.Enabled) return "Auto-Launch: Off";
-                return $"Auto-Launch: {_autoLaunchService.ScheduledTime:hh\\:mm}";
-            }
-        }
-
-        public ICommand ToggleAutoLaunchCommand { get; }
-
         public MainViewModel()
         {
             _dispatcher = Application.Current.Dispatcher;
             _discordService = new DiscordService();
             LaunchCommand = new RelayCommand<ServerStatus>(OnLaunch);
             ToggleAutoLaunchCommand = new RelayCommand<object>(OnToggleAutoLaunch);
+            ToggleSettingsCommand = new RelayCommand<object>(OnToggleSettings);
 
-            _autoLaunchService = new AutoLaunchService(_launchService, _queryService, s => _dispatcher.Invoke(() => StatusText = s));
+            SyncStartupSetting();
+
+            _autoLaunchService = new AutoLaunchService(
+                _launchService, _queryService, _configService,
+                s => _dispatcher.Invoke(() => StatusText = s));
+
+            _updateService = new UpdateService(_configService, s => _dispatcher.Invoke(() => StatusText = s));
+            _updateService.UpdateAvailable += OnUpdateAvailable;
 
             LoadAndRefresh();
             _refreshTimer = new Timer(OnRefresh, null, 10000, 10000);
+        }
+
+        public void Dispose()
+        {
+            _refreshTimer?.Dispose();
+            _autoLaunchService?.Dispose();
+            _updateService?.Dispose();
+        }
+
+        private void SyncStartupSetting()
+        {
+            var settings = _configService.LoadSettings();
+            if (StartupService.IsInStartup() && !settings.StartupOnBoot)
+                StartupService.RemoveFromStartup();
+            else if (!StartupService.IsInStartup() && settings.StartupOnBoot)
+                StartupService.AddToStartup();
+        }
+
+        private void OnUpdateAvailable(string version, string downloadUrl)
+        {
+            _dispatcher.Invoke(() =>
+            {
+                var result = MessageBox.Show(
+                    $"Version {version} is available!\n\nUpdate now?",
+                    "Update Available",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Information);
+
+                if (result == MessageBoxResult.Yes)
+                    UpdateService.DownloadAndUpdate(downloadUrl);
+            });
+        }
+
+        private void OnToggleSettings(object? parameter)
+        {
+            try
+            {
+                var dialog = new SettingsDialog(
+                    _configService,
+                    _updateService!,
+                    _autoLaunchService!,
+                    () =>
+                    {
+                        OnPropertyChanged(nameof(StartupOnBoot));
+                        OnPropertyChanged(nameof(StartMinimized));
+                        OnPropertyChanged(nameof(CheckUpdates));
+                        OnPropertyChanged(nameof(AutoLaunchEnabled));
+                        OnPropertyChanged(nameof(AutoLaunchTime));
+                        OnPropertyChanged(nameof(AutoLaunchButtonText));
+                    });
+
+                dialog.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+                MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void OnToggleAutoLaunch(object? parameter)
@@ -84,7 +192,6 @@ namespace L9HLL.Launcher
             {
                 if (_autoLaunchService == null) return;
 
-                // If already enabled, ask to disable or change time
                 if (_autoLaunchService.Enabled)
                 {
                     var result = MessageBox.Show(
@@ -118,7 +225,8 @@ namespace L9HLL.Launcher
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error: {ex.Message}\n\n{ex.StackTrace}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                ConfigService.LogError(ex);
+                MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -138,14 +246,13 @@ namespace L9HLL.Launcher
             foreach (var server in serverInfos)
             {
                 _serverInfos.Add(server);
-                var status = new ServerStatus
+                _allServers.Add(new ServerStatus
                 {
                     Name = server.Name,
                     Ip = server.Ip,
                     Port = server.Port,
                     Game = server.Game
-                };
-                _allServers.Add(status);
+                });
             }
 
             FilterServers();
@@ -158,11 +265,7 @@ namespace L9HLL.Launcher
             {
                 Servers.Clear();
                 var game = _selectedGame.ToLower();
-                var internalGame = game switch
-                {
-                    "ww2" => "hll",
-                    _ => game
-                };
+                var internalGame = game == "ww2" ? "hll" : game;
                 var filtered = _allServers.Where(s =>
                     game == "all" ||
                     (internalGame == "hll" && s.Game == "hll") ||
@@ -201,13 +304,12 @@ namespace L9HLL.Launcher
                             onlineCount++;
                     }
 
-                    var server1 = _allServers[0];
-
                     StatusText = $"{DateTime.Now:HH:mm:ss} | {onlineCount}/{results.Length} online";
                 }));
             }
             catch (Exception ex)
             {
+                ConfigService.LogError(ex);
                 StatusText = $"Error: {ex.Message}";
             }
         }
@@ -215,7 +317,6 @@ namespace L9HLL.Launcher
         private void OnLaunch(ServerStatus? server)
         {
             if (server == null) return;
-
             _discordService?.SetConnectingPresence(server);
             StatusText = $"Connecting to {server.Name}...";
             _launchService.LaunchServer(server);

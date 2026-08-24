@@ -98,31 +98,38 @@ namespace L9HLL.Launcher.Services
             var steamPath = FindSteamPath();
             bool isVietnam = server.Game == "vietnam";
 
-            if (!string.IsNullOrEmpty(steamPath))
+            try
             {
-                int appId = isVietnam ? Vietnam_AppId : HLL_AppId;
-                string cmd = isVietnam ? "open" : "+connect";
-
-                Process.Start(new ProcessStartInfo
+                if (!string.IsNullOrEmpty(steamPath))
                 {
-                    FileName = steamPath,
-                    Arguments = $"-applaunch {appId} \"{cmd} {server.Ip}:{server.Port}\"",
-                    UseShellExecute = true
-                });
-            }
-            else
-            {
-                var gamePath = FindGamePath(isVietnam);
-                if (!string.IsNullOrEmpty(gamePath))
-                {
+                    int appId = isVietnam ? Vietnam_AppId : HLL_AppId;
                     string cmd = isVietnam ? "open" : "+connect";
+
                     Process.Start(new ProcessStartInfo
                     {
-                        FileName = gamePath,
-                        Arguments = $"{cmd} {server.Ip}:{server.Port}",
+                        FileName = steamPath,
+                        Arguments = $"-applaunch {appId} \"{cmd} {server.Ip}:{server.Port}\"",
                         UseShellExecute = true
                     });
                 }
+                else
+                {
+                    var gamePath = FindGamePath(isVietnam);
+                    if (!string.IsNullOrEmpty(gamePath))
+                    {
+                        string cmd = isVietnam ? "open" : "+connect";
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = gamePath,
+                            Arguments = $"{cmd} {server.Ip}:{server.Port}",
+                            UseShellExecute = true
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
             }
 
             await AutoPressConnect(isVietnam);
@@ -130,35 +137,42 @@ namespace L9HLL.Launcher.Services
 
         private async Task AutoPressConnect(bool isVietnam)
         {
-            for (int i = 0; i < 15; i++)
-                await Task.Delay(1000);
-
-            for (int i = 0; i < 90; i++)
+            try
             {
-                var gameWindow = FindGameWindow(isVietnam);
-                if (gameWindow != IntPtr.Zero && IsWindow(gameWindow))
-                {
-                    SetForegroundWindow(gameWindow);
+                for (int i = 0; i < 15; i++)
                     await Task.Delay(1000);
 
-                    for (int j = 0; j < 5; j++)
+                for (int i = 0; i < 90; i++)
+                {
+                    var gameWindow = FindGameWindow(isVietnam);
+                    if (gameWindow != IntPtr.Zero && IsWindow(gameWindow))
                     {
-                        SendKeyboardInput(VK_SPACE);
-                        await Task.Delay(800);
+                        SetForegroundWindow(gameWindow);
+                        await Task.Delay(1000);
+
+                        for (int j = 0; j < 5; j++)
+                        {
+                            SendKeyboardInput(VK_SPACE);
+                            await Task.Delay(800);
+                        }
+                        for (int j = 0; j < 5; j++)
+                        {
+                            SendKeyboardInput(VK_RETURN);
+                            await Task.Delay(800);
+                        }
+                        for (int j = 0; j < 5; j++)
+                        {
+                            SendKeyboardInput(VK_ESCAPE);
+                            await Task.Delay(800);
+                        }
+                        return;
                     }
-                    for (int j = 0; j < 5; j++)
-                    {
-                        SendKeyboardInput(VK_RETURN);
-                        await Task.Delay(800);
-                    }
-                    for (int j = 0; j < 5; j++)
-                    {
-                        SendKeyboardInput(VK_ESCAPE);
-                        await Task.Delay(800);
-                    }
-                    return;
+                    await Task.Delay(1000);
                 }
-                await Task.Delay(1000);
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
             }
         }
 
@@ -196,7 +210,10 @@ namespace L9HLL.Launcher.Services
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
 
             var windowName = isVietnam ? "Hell Let Loose - Vietnam" : "Hell Let Loose";
             var hllWindow = FindWindow(null, windowName);
@@ -219,29 +236,36 @@ namespace L9HLL.Launcher.Services
                 var root = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(baseKey);
                 if (root == null) continue;
 
-                foreach (var subKey in root.GetSubKeyNames())
+                try
                 {
-                    try
+                    foreach (var subKey in root.GetSubKeyNames())
                     {
-                        using var sub = root.OpenSubKey(subKey);
-                        var displayName = sub?.GetValue("DisplayName") as string;
-                        if (displayName == null) continue;
-
-                        if (isVietnam && !displayName.Contains("Vietnam")) continue;
-                        if (!isVietnam && !displayName.Contains("Hell Let Loose")) continue;
-
-                        var installPath = sub.GetValue("InstallLocation") as string
-                                        ?? sub.GetValue("InstallPath") as string;
-
-                        if (!string.IsNullOrEmpty(installPath))
+                        try
                         {
-                            var trimmed = installPath.TrimEnd('\\');
-                            var gameExe = Path.Combine(trimmed, isVietnam ? "HLLVietnam.exe" : "Hell Let Loose.exe");
-                            if (File.Exists(gameExe))
-                                return gameExe;
+                            using var sub = root.OpenSubKey(subKey);
+                            var displayName = sub?.GetValue("DisplayName") as string;
+                            if (displayName == null) continue;
+
+                            if (isVietnam && !displayName.Contains("Vietnam")) continue;
+                            if (!isVietnam && !displayName.Contains("Hell Let Loose")) continue;
+
+                            var installPath = sub.GetValue("InstallLocation") as string
+                                            ?? sub.GetValue("InstallPath") as string;
+
+                            if (!string.IsNullOrEmpty(installPath))
+                            {
+                                var trimmed = installPath.TrimEnd('\\');
+                                var gameExe = Path.Combine(trimmed, isVietnam ? "HLLVietnam.exe" : "Hell Let Loose.exe");
+                                if (File.Exists(gameExe))
+                                    return gameExe;
+                            }
                         }
+                        catch { }
                     }
-                    catch { }
+                }
+                catch (Exception ex)
+                {
+                    ConfigService.LogError(ex);
                 }
             }
 
@@ -250,14 +274,21 @@ namespace L9HLL.Launcher.Services
 
         private static string? FindSteamPath()
         {
-            var installPath = (string?)Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Valve\Steam", "InstallPath", null)
-                           ?? (string?)Registry.GetValue(@"HKEY_CURRENT_USER\SOFTWARE\Valve\Steam", "InstallPath", null);
-
-            if (!string.IsNullOrEmpty(installPath))
+            try
             {
-                var steamExe = Path.Combine(installPath, "Steam.exe");
-                if (File.Exists(steamExe))
-                    return steamExe;
+                var installPath = (string?)Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Valve\Steam", "InstallPath", null)
+                               ?? (string?)Registry.GetValue(@"HKEY_CURRENT_USER\SOFTWARE\Valve\Steam", "InstallPath", null);
+
+                if (!string.IsNullOrEmpty(installPath))
+                {
+                    var steamExe = Path.Combine(installPath, "Steam.exe");
+                    if (File.Exists(steamExe))
+                        return steamExe;
+                }
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
             }
 
             return null;

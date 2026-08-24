@@ -1,7 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.IO;
-using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
@@ -15,43 +13,50 @@ namespace L9HLL.Launcher.Services
         private readonly DispatcherTimer _timer;
         private readonly LaunchService _launchService;
         private readonly ServerQueryService _queryService;
+        private readonly ConfigService _configService;
         private readonly Action<string> _onStatus;
         private readonly Dispatcher _dispatcher;
-        private bool _enabled;
-        private TimeSpan _scheduledTime;
         private bool _triggeredToday;
         private DateTime _lastDate;
 
         public bool Enabled
         {
-            get => _enabled;
+            get => _configService.LoadSettings().AutoLaunchEnabled;
             set
             {
-                _enabled = value;
-                SaveConfig();
+                var settings = _configService.LoadSettings();
+                settings.AutoLaunchEnabled = value;
+                _configService.SaveSettings(settings);
             }
         }
 
         public TimeSpan ScheduledTime
         {
-            get => _scheduledTime;
+            get
+            {
+                var settings = _configService.LoadSettings();
+                return TimeSpan.TryParse(settings.AutoLaunchTime, out var t) ? t : new TimeSpan(22, 0, 0);
+            }
             set
             {
-                _scheduledTime = value;
-                SaveConfig();
+                var settings = _configService.LoadSettings();
+                settings.AutoLaunchTime = value.ToString(@"hh\:mm");
+                _configService.SaveSettings(settings);
             }
         }
 
-        public AutoLaunchService(LaunchService launchService, ServerQueryService queryService, Action<string> onStatus)
+        public AutoLaunchService(
+            LaunchService launchService,
+            ServerQueryService queryService,
+            ConfigService configService,
+            Action<string> onStatus)
         {
             _launchService = launchService;
             _queryService = queryService;
+            _configService = configService;
             _onStatus = onStatus;
-            _dispatcher = System.Windows.Application.Current.Dispatcher;
-            _scheduledTime = new TimeSpan(22, 0, 0);
+            _dispatcher = Application.Current.Dispatcher;
             _lastDate = DateTime.Today.AddDays(-1);
-
-            LoadConfig();
 
             _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
             _timer.Tick += OnTick;
@@ -66,8 +71,6 @@ namespace L9HLL.Launcher.Services
 
         private void OnTick(object? sender, EventArgs e)
         {
-            if (!_enabled || _triggeredToday) return;
-
             var now = DateTime.Now;
             if (now.Date != _lastDate)
             {
@@ -75,8 +78,10 @@ namespace L9HLL.Launcher.Services
                 _lastDate = now.Date;
             }
 
+            if (!Enabled || _triggeredToday) return;
+
             var currentTime = now.TimeOfDay;
-            var target = _scheduledTime;
+            var target = ScheduledTime;
 
             if (currentTime >= target && currentTime < target + TimeSpan.FromSeconds(30))
             {
@@ -142,17 +147,25 @@ namespace L9HLL.Launcher.Services
 
             _dispatcher.Invoke(() =>
             {
-                var dialog = new AutoLaunchDialog(server.Name);
-                dialog.ShowDialog();
+                try
+                {
+                    var dialog = new AutoLaunchDialog(server.Name);
+                    dialog.ShowDialog();
 
-                if (!dialog.WasCancelled)
-                {
-                    UpdateStatus($"Auto-launching {server.Name}...");
-                    _launchService.LaunchServer(server);
+                    if (!dialog.WasCancelled)
+                    {
+                        UpdateStatus($"Auto-launching {server.Name}...");
+                        _launchService.LaunchServer(server);
+                    }
+                    else
+                    {
+                        UpdateStatus("Auto-Launch cancelled");
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    UpdateStatus("Auto-Launch cancelled");
+                    ConfigService.LogError(ex);
+                    UpdateStatus($"Auto-Launch error: {ex.Message}");
                 }
             });
         }
@@ -171,7 +184,10 @@ namespace L9HLL.Launcher.Services
                         return true;
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
 
             return false;
         }
@@ -181,52 +197,9 @@ namespace L9HLL.Launcher.Services
             _onStatus?.Invoke(message);
         }
 
-        private void LoadConfig()
-        {
-            try
-            {
-                var exeDir = AppDomain.CurrentDomain.BaseDirectory;
-                var configPath = Path.Combine(exeDir, "Config", "autolaunch.json");
-
-                if (File.Exists(configPath))
-                {
-                    var json = File.ReadAllText(configPath);
-                    var config = JsonSerializer.Deserialize<AutoLaunchConfig>(json);
-                    if (config != null)
-                    {
-                        _enabled = config.Enabled;
-                        _scheduledTime = config.ScheduledTime;
-                    }
-                }
-            }
-            catch { }
-        }
-
-        private void SaveConfig()
-        {
-            try
-            {
-                var exeDir = AppDomain.CurrentDomain.BaseDirectory;
-                var configDir = Path.Combine(exeDir, "Config");
-                Directory.CreateDirectory(configDir);
-                var configPath = Path.Combine(configDir, "autolaunch.json");
-
-                var config = new AutoLaunchConfig { Enabled = _enabled, ScheduledTime = _scheduledTime };
-                var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(configPath, json);
-            }
-            catch { }
-        }
-
         public void Dispose()
         {
             _timer.Stop();
-        }
-
-        private class AutoLaunchConfig
-        {
-            public bool Enabled { get; set; }
-            public TimeSpan ScheduledTime { get; set; }
         }
     }
 }

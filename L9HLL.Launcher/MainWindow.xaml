@@ -49,6 +49,10 @@
                             Command="{Binding ToggleAutoLaunchCommand}"/>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="SettingsBtn" Content="&#xE713;" FontFamily="Segoe MDL2 Assets" Width="28" Height="24" FontSize="12"
+                                Background="Transparent" Foreground="#aaa" BorderBrush="Transparent"
+                                Cursor="Hand" Click="SettingsBtn_Click"
+                                MouseEnter="SettingsBtn_MouseEnter" MouseLeave="SettingsBtn_MouseLeave"/>
                         <Button x:Name="MinimizeBtn" Content="_" Width="28" Height="24" FontSize="14"
                                 Background="Transparent" Foreground="#aaa" BorderBrush="Transparent"
                                 Cursor="Hand" Click="MinimizeBtn_Click"/>

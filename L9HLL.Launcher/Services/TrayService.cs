@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
@@ -19,11 +21,14 @@ namespace L9HLL.Launcher.Services
         private readonly LaunchService _launchService;
         private readonly ServerQueryService _queryService;
         private readonly DispatcherTimer _refreshTimer;
-        private ToolStripMenuItem? _serversHeader;
-        private ToolStripSeparator? _serversSeparator;
+        private readonly Dictionary<string, ToolStripMenuItem> _serverMenuItems = new();
         private bool _isRefreshing;
 
-        public TrayService(MainWindow mainWindow, MainViewModel viewModel, LaunchService launchService, ServerQueryService queryService)
+        public TrayService(
+            MainWindow mainWindow,
+            MainViewModel viewModel,
+            LaunchService launchService,
+            ServerQueryService queryService)
         {
             _mainWindow = mainWindow;
             _viewModel = viewModel;
@@ -32,15 +37,24 @@ namespace L9HLL.Launcher.Services
 
             _contextMenu = new ContextMenuStrip();
 
-            _serversHeader = new ToolStripMenuItem("Servers");
-            _serversHeader.Font = new Font(_serversHeader.Font, System.Drawing.FontStyle.Bold);
-            _serversHeader.Enabled = false;
-            _contextMenu.Items.Add(_serversHeader);
+            var serversHeader = new ToolStripMenuItem("Servers");
+            serversHeader.Font = new Font(serversHeader.Font, System.Drawing.FontStyle.Bold);
+            serversHeader.Enabled = false;
+            _contextMenu.Items.Add(serversHeader);
 
-            _serversSeparator = new ToolStripSeparator();
-            _contextMenu.Items.Add(_serversSeparator);
+            var serversSeparator = new ToolStripSeparator();
+            _contextMenu.Items.Add(serversSeparator);
 
             _contextMenu.Items.Add("-");
+            _contextMenu.Items.Add("Settings", null, (s, e) =>
+            {
+                Restore();
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(300);
+                    System.Windows.Application.Current.Dispatcher.Invoke(() => _viewModel.ToggleSettingsCommand.Execute(null));
+                });
+            });
             _contextMenu.Items.Add("Restore", null, (s, e) => Restore());
             _contextMenu.Items.Add("Exit", null, (s, e) => Exit());
 
@@ -54,13 +68,16 @@ namespace L9HLL.Launcher.Services
             try
             {
                 var exeDir = AppDomain.CurrentDomain.BaseDirectory;
-                var iconPath = Path.Combine(exeDir, "L9HLL.Launcher.exe");
-                if (File.Exists(iconPath))
+                var exePath = Path.Combine(exeDir, "L9HLL.Launcher.exe");
+                if (File.Exists(exePath))
                 {
-                    _notifyIcon.Icon = Icon.ExtractAssociatedIcon(iconPath);
+                    _notifyIcon.Icon = Icon.ExtractAssociatedIcon(exePath);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
 
             _notifyIcon.DoubleClick += (s, e) => Restore();
 
@@ -73,40 +90,77 @@ namespace L9HLL.Launcher.Services
 
         private void OnRefreshTick(object? sender, EventArgs e)
         {
-            BuildServerMenu();
+            try
+            {
+                BuildServerMenu();
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
         }
 
         private void BuildServerMenu()
         {
             if (_isRefreshing) return;
 
-            var existingItems = _contextMenu.Items;
-            int startIdx = 2;
-            int count = 0;
-            while (startIdx + count < existingItems.Count && existingItems[startIdx + count] is not ToolStripSeparator)
-                count++;
-
-            for (int i = 0; i < count; i++)
-                existingItems.RemoveAt(startIdx);
-
-            var servers = _viewModel.Servers;
-            foreach (var server in servers)
+            try
             {
-                var status = server.IsOnline ? $"({server.PlayerCount}/{server.MaxPlayers})" : "(Offline)";
-                var mapInfo = string.IsNullOrEmpty(server.Map) ? "" : $" - {server.Map}";
-                var item = new ToolStripMenuItem($"{server.Name} {status}{mapInfo}");
+                var servers = _viewModel.Servers;
+                var currentKeys = new HashSet<string>();
 
-                if (server.IsOnline)
+                foreach (var server in servers)
                 {
-                    item.Click += async (s, e) => await OnQuickLaunch(server, (ToolStripMenuItem)s!);
-                }
-                else
-                {
-                    item.Enabled = false;
-                    item.ForeColor = Color.FromArgb(100, 100, 100);
+                    currentKeys.Add(server.Name);
+                    var status = server.IsOnline ? $"({server.PlayerCount}/{server.MaxPlayers})" : "(Offline)";
+                    var mapInfo = string.IsNullOrEmpty(server.Map) ? "" : $" - {server.Map}";
+                    var text = $"{server.Name} {status}{mapInfo}";
+
+                    if (_serverMenuItems.TryGetValue(server.Name, out var existingItem))
+                    {
+                        existingItem.Text = text;
+                        if (server.IsOnline)
+                        {
+                            existingItem.Enabled = true;
+                            existingItem.ForeColor = Color.Empty;
+                        }
+                        else
+                        {
+                            existingItem.Enabled = false;
+                            existingItem.ForeColor = Color.FromArgb(100, 100, 100);
+                        }
+                    }
+                    else
+                    {
+                        var item = new ToolStripMenuItem(text);
+                        if (server.IsOnline)
+                        {
+                            item.Click += async (s, ev) => await OnQuickLaunch(server, (ToolStripMenuItem)s!);
+                        }
+                        else
+                        {
+                            item.Enabled = false;
+                            item.ForeColor = Color.FromArgb(100, 100, 100);
+                        }
+                        _serverMenuItems[server.Name] = item;
+                        _contextMenu.Items.Insert(2, item);
+                    }
                 }
 
-                existingItems.Insert(startIdx, item);
+                var staleKeys = _serverMenuItems.Keys.ToList();
+                foreach (var name in staleKeys)
+                {
+                    if (!currentKeys.Contains(name))
+                    {
+                        _contextMenu.Items.Remove(_serverMenuItems[name]);
+                        _serverMenuItems[name].Dispose();
+                        _serverMenuItems.Remove(name);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
             }
         }
 
@@ -115,11 +169,11 @@ namespace L9HLL.Launcher.Services
             if (_isRefreshing) return;
             _isRefreshing = true;
 
-            item.Enabled = false;
-            item.Text = $"[L9] {server.Name} (Querying...)";
-
             try
             {
+                SetItemText(item, $"[L9] {server.Name} (Querying...)");
+                item.Enabled = false;
+
                 var serverInfo = new ServerInfo
                 {
                     Name = server.Name,
@@ -132,22 +186,27 @@ namespace L9HLL.Launcher.Services
 
                 if (status.IsOnline)
                 {
-                    item.Text = $"[L9] {server.Name} ({status.PlayerCount}/{status.MaxPlayers})";
+                    SetItemText(item, $"[L9] {server.Name} ({status.PlayerCount}/{status.MaxPlayers})");
                     item.Enabled = true;
                     _launchService.LaunchServer(server);
                 }
                 else
                 {
-                    item.Text = $"[L9] {server.Name} (Offline)";
+                    SetItemText(item, $"[L9] {server.Name} (Offline)");
                     item.Enabled = false;
                     item.ForeColor = Color.FromArgb(100, 100, 100);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                item.Text = $"[L9] {server.Name} (Query Failed)";
-                item.Enabled = false;
-                item.ForeColor = Color.FromArgb(100, 100, 100);
+                ConfigService.LogError(ex);
+                try
+                {
+                    SetItemText(item, $"[L9] {server.Name} (Query Failed)");
+                    item.Enabled = false;
+                    item.ForeColor = Color.FromArgb(100, 100, 100);
+                }
+                catch { }
             }
             finally
             {
@@ -155,24 +214,65 @@ namespace L9HLL.Launcher.Services
             }
         }
 
+        private void SetItemText(ToolStripMenuItem item, string text)
+        {
+            try
+            {
+                _contextMenu.Invoke(new Action(() => item.Text = text));
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
+        }
+
         public void Restore()
         {
-            _mainWindow.Show();
-            _mainWindow.WindowState = WindowState.Normal;
-            _mainWindow.Activate();
+            try
+            {
+                if (_mainWindow.IsLoaded)
+                {
+                    _mainWindow.Show();
+                    _mainWindow.WindowState = WindowState.Normal;
+                    _mainWindow.Activate();
+                }
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
         }
 
         public void Exit()
         {
-            _notifyIcon.Visible = false;
+            try
+            {
+                _notifyIcon.Visible = false;
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
             System.Windows.Application.Current.Shutdown();
         }
 
         public void Dispose()
         {
-            _refreshTimer?.Stop();
-            _notifyIcon?.Dispose();
-            _contextMenu?.Dispose();
+            try
+            {
+                _refreshTimer.Stop();
+            }
+            catch { }
+            try
+            {
+                _notifyIcon?.Dispose();
+            }
+            catch { }
+            try
+            {
+                _contextMenu?.Dispose();
+            }
+            catch { }
         }
     }
 }

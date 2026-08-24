@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using L9HLL.Launcher.Models;
@@ -9,6 +10,9 @@ namespace L9HLL.Launcher.Services
 {
     public class ConfigService
     {
+        public static string CurrentVersion =>
+            Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0";
+
         public List<ServerInfo> LoadServers()
         {
             var exePath = Environment.ProcessPath ?? "";
@@ -24,7 +28,10 @@ namespace L9HLL.Launcher.Services
                     return config?.Servers ?? new List<ServerInfo>();
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogError(ex);
+            }
 
             return new List<ServerInfo>
             {
@@ -39,5 +46,69 @@ namespace L9HLL.Launcher.Services
             [JsonPropertyName("servers")]
             public List<ServerInfo>? Servers { get; set; }
         }
+
+        private string GetConfigDir()
+        {
+            var exePath = Environment.ProcessPath ?? "";
+            var exeDir = Path.GetDirectoryName(exePath) ?? AppDomain.CurrentDomain.BaseDirectory;
+            var configDir = Path.Combine(exeDir, "Config");
+            Directory.CreateDirectory(configDir);
+            return configDir;
+        }
+
+        private string GetConfigPath() => Path.Combine(GetConfigDir(), "app.json");
+
+        public AppSettings LoadSettings()
+        {
+            var path = GetConfigPath();
+            try
+            {
+                if (File.Exists(path))
+                {
+                    var json = File.ReadAllText(path);
+                    var settings = JsonSerializer.Deserialize<AppSettings>(json);
+                    return settings ?? new AppSettings();
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError(ex);
+            }
+            return new AppSettings();
+        }
+
+        public void SaveSettings(AppSettings settings)
+        {
+            try
+            {
+                var path = GetConfigPath();
+                var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(path, json);
+            }
+            catch (Exception ex)
+            {
+                LogError(ex);
+            }
+        }
+
+        public static void LogError(Exception ex)
+        {
+            try
+            {
+                var exeDir = AppDomain.CurrentDomain.BaseDirectory;
+                var logPath = Path.Combine(exeDir, "debug.log");
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} | {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}\n\n");
+            }
+            catch { }
+        }
+    }
+
+    public class AppSettings
+    {
+        public bool StartupOnBoot { get; set; }
+        public bool StartMinimized { get; set; }
+        public bool CheckUpdates { get; set; } = true;
+        public bool AutoLaunchEnabled { get; set; }
+        public string AutoLaunchTime { get; set; } = "22:00";
     }
 }
