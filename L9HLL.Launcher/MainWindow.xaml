@@ -7,7 +7,8 @@
         ResizeMode="NoResize"
         Background="Transparent"
         WindowStyle="None"
-        AllowsTransparency="True">
+        AllowsTransparency="True"
+        Closing="OnWindowClosing">
     <WindowChrome.WindowChrome>
         <WindowChrome GlassFrameThickness="0" CaptionHeight="0" CornerRadius="8"/>
     </WindowChrome.WindowChrome>
@@ -27,8 +28,25 @@
             <!-- Dark overlay -->
             <Rectangle Fill="#000000" Opacity="0.7"/>
 
+            <!-- Control buttons -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="8,8,8,0">
+                <Button x:Name="MinimizeBtn" Content="_" Width="32" Height="24" FontSize="14"
+                        Background="Transparent" Foreground="#aaa" BorderBrush="Transparent"
+                        Cursor="Hand" Click="MinimizeBtn_Click" Margin="0,0,2,0"/>
+                <Button x:Name="CloseBtn" Content="X" Width="32" Height="24" FontSize="12"
+                        Background="Transparent" Foreground="#aaa" BorderBrush="Transparent"
+                        Cursor="Hand" Click="CloseBtn_Click" Margin="2,0,0,0"/>
+            </StackPanel>
+
+            <!-- Auto-launch button -->
+            <Button Content="{Binding AutoLaunchButtonText}" Width="160" Height="28"
+                    HorizontalAlignment="Left" Margin="8,8,0,0"
+                    Background="#2a2a2a" Foreground="#8a9a5b" BorderBrush="#444"
+                    FontSize="11" Cursor="Hand"
+                    Command="{Binding ToggleAutoLaunchCommand}"/>
+
             <!-- Content -->
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="24,24,24,12">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="24,44,24,12">
                 <StackPanel HorizontalAlignment="Center">
                     <Image Source="pack://application:,,,/L9HLL.Launcher;component/assets/l9_logo_small.png"
                            Width="100" Height="96"

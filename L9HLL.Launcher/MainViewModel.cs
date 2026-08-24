@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
+using L9HLL.Launcher.Dialogs;
 using L9HLL.Launcher.Models;
 using L9HLL.Launcher.Services;
 
@@ -22,6 +23,7 @@ namespace L9HLL.Launcher
         private DiscordService? _discordService;
         private Timer? _refreshTimer;
         private readonly Dispatcher _dispatcher;
+        private AutoLaunchService? _autoLaunchService;
 
         private string _selectedGame = "all";
         public string SelectedGame
@@ -41,6 +43,7 @@ namespace L9HLL.Launcher
         private List<ServerStatus> _allServers = new();
         public ObservableCollection<ServerStatus> Servers { get; } = new();
         public ICommand LaunchCommand { get; }
+
         public string StatusText
         {
             get => _statusText;
@@ -48,13 +51,47 @@ namespace L9HLL.Launcher
         }
         private string _statusText = "Loading...";
 
+        public string AutoLaunchButtonText
+        {
+            get
+            {
+                if (_autoLaunchService == null) return "Auto-Launch: Off";
+                if (!_autoLaunchService.Enabled) return "Auto-Launch: Off";
+                return $"Auto-Launch: {_autoLaunchService.ScheduledTime:HH\\:mm}";
+            }
+        }
+
+        public ICommand ToggleAutoLaunchCommand { get; }
+
         public MainViewModel()
         {
             _dispatcher = Application.Current.Dispatcher;
             _discordService = new DiscordService();
             LaunchCommand = new RelayCommand<ServerStatus>(OnLaunch);
+            ToggleAutoLaunchCommand = new RelayCommand<object>(OnToggleAutoLaunch);
+
+            _autoLaunchService = new AutoLaunchService(_launchService, s => StatusText = s);
+
             LoadAndRefresh();
             _refreshTimer = new Timer(OnRefresh, null, 10000, 10000);
+        }
+
+        private void OnToggleAutoLaunch(object? parameter)
+        {
+            if (_autoLaunchService == null) return;
+
+            var dialog = new TimePickerDialog(
+                (int)_autoLaunchService.ScheduledTime.TotalHours,
+                _autoLaunchService.ScheduledTime.Minutes);
+
+            if (dialog.ShowDialog() == true)
+            {
+                _autoLaunchService.ScheduledTime = new TimeSpan(dialog.SelectedHour, dialog.SelectedMinute, 0);
+                _autoLaunchService.Enabled = true;
+                _autoLaunchService.ResetTrigger();
+                OnPropertyChanged(nameof(AutoLaunchButtonText));
+                StatusText = $"Auto-Launch enabled for {_autoLaunchService.ScheduledTime:HH\\:mm}";
+            }
         }
 
         private void LoadAndRefresh()
@@ -135,6 +172,9 @@ namespace L9HLL.Launcher
                         if (result.IsOnline)
                             onlineCount++;
                     }
+
+                    var server1 = _allServers[0];
+                    _autoLaunchService?.UpdateServer1PlayerCount(server1.PlayerCount);
 
                     StatusText = $"{DateTime.Now:HH:mm:ss} | {onlineCount}/{results.Length} online";
                 }));
