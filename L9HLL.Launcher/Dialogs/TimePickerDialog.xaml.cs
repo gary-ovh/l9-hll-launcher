@@ -1,5 +1,8 @@
 using System;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
 
 namespace L9HLL.Launcher.Dialogs
 {
@@ -27,18 +30,21 @@ namespace L9HLL.Launcher.Dialogs
             SelectedMinute = defaultMinute;
             HourList.SelectedItem = defaultHour.ToString("D2");
             MinuteList.SelectedItem = defaultMinute.ToString("D2");
-            UpdateDisplay();
 
-            HourList.SelectionChanged += (s, e) => { SelectedHour = HourList.SelectedIndex; UpdateDisplay(); };
-            MinuteList.SelectionChanged += (s, e) => { SelectedMinute = MinuteList.SelectedIndex; UpdateDisplay(); };
+            HourList.SelectionChanged += (s, e) => { SelectedHour = HourList.SelectedIndex; };
+            MinuteList.SelectionChanged += (s, e) => { SelectedMinute = MinuteList.SelectedIndex; };
         }
 
-        private void UpdateDisplay()
+        private void Window_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (HourList.SelectedIndex >= 0 && MinuteList.SelectedIndex >= 0)
+            var source = e.OriginalSource as DependencyObject;
+            while (source != null)
             {
-                SelectedTimeText.Text = $"{HourList.SelectedIndex:D2}:{MinuteList.SelectedIndex:D2}";
+                if (source is ListBoxItem || source is Button)
+                    return;
+                source = System.Windows.Media.VisualTreeHelper.GetParent(source);
             }
+            DragMove();
         }
 
         private void OkBtn_Click(object sender, RoutedEventArgs e)

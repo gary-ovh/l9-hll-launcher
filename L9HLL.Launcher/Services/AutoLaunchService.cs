@@ -14,13 +14,13 @@ namespace L9HLL.Launcher.Services
     {
         private readonly DispatcherTimer _timer;
         private readonly LaunchService _launchService;
+        private readonly ServerQueryService _queryService;
         private readonly Action<string> _onStatus;
         private readonly Dispatcher _dispatcher;
         private bool _enabled;
         private TimeSpan _scheduledTime;
         private bool _triggeredToday;
         private DateTime _lastDate;
-        private int _server1PlayerCount = -1;
 
         public bool Enabled
         {
@@ -42,9 +42,10 @@ namespace L9HLL.Launcher.Services
             }
         }
 
-        public AutoLaunchService(LaunchService launchService, Action<string> onStatus)
+        public AutoLaunchService(LaunchService launchService, ServerQueryService queryService, Action<string> onStatus)
         {
             _launchService = launchService;
+            _queryService = queryService;
             _onStatus = onStatus;
             _dispatcher = System.Windows.Application.Current.Dispatcher;
             _scheduledTime = new TimeSpan(22, 0, 0);
@@ -61,11 +62,6 @@ namespace L9HLL.Launcher.Services
         {
             _triggeredToday = false;
             _lastDate = DateTime.Today.AddDays(-1);
-        }
-
-        public void UpdateServer1PlayerCount(int count)
-        {
-            _server1PlayerCount = count;
         }
 
         private void OnTick(object? sender, EventArgs e)
@@ -89,7 +85,7 @@ namespace L9HLL.Launcher.Services
             }
         }
 
-        private void CheckAndLaunch()
+        private async void CheckAndLaunch()
         {
             if (IsGameRunning(true))
             {
@@ -103,7 +99,46 @@ namespace L9HLL.Launcher.Services
                 return;
             }
 
-            var server = ResolveServer();
+            UpdateStatus("Auto-Launch: querying servers...");
+
+            var server1Info = new ServerInfo
+            {
+                Name = "[L9] The Loyal Nine |#1|",
+                Ip = "40.27.41.16",
+                Port = 7777,
+                Game = "hll"
+            };
+            var server2Info = new ServerInfo
+            {
+                Name = "[L9] The Loyal Nine |#2|",
+                Ip = "40.27.41.9",
+                Port = 7777,
+                Game = "hll"
+            };
+
+            var (r1, _) = await _queryService.QueryAsync(server1Info);
+            var (r2, _) = await _queryService.QueryAsync(server2Info);
+
+            ServerStatus server;
+
+            if (r1.IsOnline && r1.PlayerCount < 60)
+            {
+                server = r1;
+            }
+            else if (r2.IsOnline)
+            {
+                server = r2;
+            }
+            else
+            {
+                server = new ServerStatus
+                {
+                    Name = "[L9] The Loyal Nine |#1|",
+                    Ip = "40.27.41.16",
+                    Port = 7777,
+                    Game = "hll"
+                };
+            }
 
             _dispatcher.Invoke(() =>
             {
@@ -120,28 +155,6 @@ namespace L9HLL.Launcher.Services
                     UpdateStatus("Auto-Launch cancelled");
                 }
             });
-        }
-
-        private ServerStatus ResolveServer()
-        {
-            if (_server1PlayerCount >= 0 && _server1PlayerCount >= 60)
-            {
-                return new ServerStatus
-                {
-                    Name = "[L9] The Loyal Nine |#2|",
-                    Ip = "40.27.41.9",
-                    Port = 7777,
-                    Game = "hll"
-                };
-            }
-
-            return new ServerStatus
-            {
-                Name = "[L9] The Loyal Nine |#1|",
-                Ip = "40.27.41.16",
-                Port = 7777,
-                Game = "hll"
-            };
         }
 
         private bool IsGameRunning(bool isVietnam)
