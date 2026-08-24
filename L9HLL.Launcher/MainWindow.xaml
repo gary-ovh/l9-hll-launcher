@@ -42,9 +42,9 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <Button Grid.Column="0" Content="{Binding AutoLaunchButtonText}" Height="24"
-                            Background="Transparent" Foreground="#8a9a5b" BorderBrush="Transparent"
-                            FontSize="11" Cursor="Hand" Margin="12,0,0,0"
+                    <Button Grid.Column="0" Content="{Binding AutoLaunchButtonText}" Height="24" MinWidth="140"
+                            Background="#1a1a1a" Foreground="#8a9a5b" BorderBrush="#444" BorderThickness="1"
+                            FontSize="11" Cursor="Hand" Margin="8,0,0,0"
                             HorizontalAlignment="Left" VerticalAlignment="Center"
                             Command="{Binding ToggleAutoLaunchCommand}"/>
 

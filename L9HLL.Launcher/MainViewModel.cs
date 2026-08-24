@@ -20,6 +20,8 @@ namespace L9HLL.Launcher
         private readonly ServerQueryService _queryService = new();
         private readonly ConfigService _configService = new();
         private readonly LaunchService _launchService = new();
+        public ServerQueryService QueryService => _queryService;
+        public LaunchService LaunchService => _launchService;
         private DiscordService? _discordService;
         private Timer? _refreshTimer;
         private readonly Dispatcher _dispatcher;
@@ -57,7 +59,7 @@ namespace L9HLL.Launcher
             {
                 if (_autoLaunchService == null) return "Auto-Launch: Off";
                 if (!_autoLaunchService.Enabled) return "Auto-Launch: Off";
-                return $"Auto-Launch: {_autoLaunchService.ScheduledTime:HH\\:mm}";
+                return $"Auto-Launch: {_autoLaunchService.ScheduledTime:hh\\:mm}";
             }
         }
 
@@ -86,7 +88,7 @@ namespace L9HLL.Launcher
                 if (_autoLaunchService.Enabled)
                 {
                     var result = MessageBox.Show(
-                        $"Auto-launch is currently set for {_autoLaunchService.ScheduledTime:HH\\:mm}.\n\nClick OK to change time, or Cancel to disable.",
+                        $"Auto-launch is currently set for {_autoLaunchService.ScheduledTime:hh\\:mm}.\n\nClick OK to change time, or Cancel to disable.",
                         "Auto-Launch",
                         MessageBoxButton.OKCancel,
                         MessageBoxImage.Question);
@@ -111,7 +113,7 @@ namespace L9HLL.Launcher
                     _autoLaunchService.Enabled = true;
                     _autoLaunchService.ResetTrigger();
                     OnPropertyChanged(nameof(AutoLaunchButtonText));
-                    StatusText = $"Auto-Launch enabled for {_autoLaunchService.ScheduledTime:HH\\:mm}";
+                    StatusText = $"Auto-Launch enabled for {_autoLaunchService.ScheduledTime:hh\\:mm}";
                 }
             }
             catch (Exception ex)

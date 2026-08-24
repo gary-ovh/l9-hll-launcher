@@ -14,8 +14,9 @@ namespace L9HLL.Launcher
         public MainWindow()
         {
             InitializeComponent();
-            DataContext = new MainViewModel();
-            _trayService = new TrayService(this);
+            var viewModel = new MainViewModel();
+            DataContext = viewModel;
+            _trayService = new TrayService(this, viewModel, viewModel.LaunchService, viewModel.QueryService);
             StateChanged += OnStateChanged;
             Closing += OnWindowClosing;
 
