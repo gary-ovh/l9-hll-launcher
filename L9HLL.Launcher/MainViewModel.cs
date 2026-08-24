@@ -70,7 +70,7 @@ namespace L9HLL.Launcher
             LaunchCommand = new RelayCommand<ServerStatus>(OnLaunch);
             ToggleAutoLaunchCommand = new RelayCommand<object>(OnToggleAutoLaunch);
 
-            _autoLaunchService = new AutoLaunchService(_launchService, _queryService, s => StatusText = s);
+            _autoLaunchService = new AutoLaunchService(_launchService, _queryService, s => _dispatcher.Invoke(() => StatusText = s));
 
             LoadAndRefresh();
             _refreshTimer = new Timer(OnRefresh, null, 10000, 10000);
@@ -78,38 +78,45 @@ namespace L9HLL.Launcher
 
         private void OnToggleAutoLaunch(object? parameter)
         {
-            if (_autoLaunchService == null) return;
-
-            // If already enabled, ask to disable or change time
-            if (_autoLaunchService.Enabled)
+            try
             {
-                var result = MessageBox.Show(
-                    $"Auto-launch is currently set for {_autoLaunchService.ScheduledTime:HH\\:mm}.\n\nClick OK to change time, or Cancel to disable.",
-                    "Auto-Launch",
-                    MessageBoxButton.OKCancel,
-                    MessageBoxImage.Question);
+                if (_autoLaunchService == null) return;
 
-                if (result == MessageBoxResult.Cancel)
+                // If already enabled, ask to disable or change time
+                if (_autoLaunchService.Enabled)
                 {
-                    _autoLaunchService.Enabled = false;
+                    var result = MessageBox.Show(
+                        $"Auto-launch is currently set for {_autoLaunchService.ScheduledTime:HH\\:mm}.\n\nClick OK to change time, or Cancel to disable.",
+                        "Auto-Launch",
+                        MessageBoxButton.OKCancel,
+                        MessageBoxImage.Question);
+
+                    if (result == MessageBoxResult.Cancel)
+                    {
+                        _autoLaunchService.Enabled = false;
+                        _autoLaunchService.ResetTrigger();
+                        OnPropertyChanged(nameof(AutoLaunchButtonText));
+                        StatusText = "Auto-Launch disabled";
+                        return;
+                    }
+                }
+
+                var dialog = new TimePickerDialog(
+                    (int)_autoLaunchService.ScheduledTime.TotalHours,
+                    _autoLaunchService.ScheduledTime.Minutes);
+
+                if (dialog.ShowDialog() == true)
+                {
+                    _autoLaunchService.ScheduledTime = new TimeSpan(dialog.SelectedHour, dialog.SelectedMinute, 0);
+                    _autoLaunchService.Enabled = true;
                     _autoLaunchService.ResetTrigger();
                     OnPropertyChanged(nameof(AutoLaunchButtonText));
-                    StatusText = "Auto-Launch disabled";
-                    return;
+                    StatusText = $"Auto-Launch enabled for {_autoLaunchService.ScheduledTime:HH\\:mm}";
                 }
             }
-
-            var dialog = new TimePickerDialog(
-                (int)_autoLaunchService.ScheduledTime.TotalHours,
-                _autoLaunchService.ScheduledTime.Minutes);
-
-            if (dialog.ShowDialog() == true)
+            catch (Exception ex)
             {
-                _autoLaunchService.ScheduledTime = new TimeSpan(dialog.SelectedHour, dialog.SelectedMinute, 0);
-                _autoLaunchService.Enabled = true;
-                _autoLaunchService.ResetTrigger();
-                OnPropertyChanged(nameof(AutoLaunchButtonText));
-                StatusText = $"Auto-Launch enabled for {_autoLaunchService.ScheduledTime:HH\\:mm}";
+                MessageBox.Show($"Error: {ex.Message}\n\n{ex.StackTrace}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
