@@ -21,6 +21,7 @@ namespace L9HLL.Launcher.Services
         private DateTime _lastDate;
         private ServerInfo? _launchedServer;
         private bool _seededDialogShown;
+        private AutoLaunchDialog? _pendingDialog;
 
         public bool Enabled
         {
@@ -149,7 +150,10 @@ namespace L9HLL.Launcher.Services
             }
 
             var dialog = new AutoLaunchDialog(server.Name);
+            _pendingDialog = dialog;
             dialog.Closed += (s, e) =>
+            {
+                _pendingDialog = null;
             {
                 if (!dialog.WasCancelled)
                 {
