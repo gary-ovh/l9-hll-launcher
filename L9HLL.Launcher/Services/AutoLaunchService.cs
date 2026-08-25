@@ -11,6 +11,7 @@ namespace L9HLL.Launcher.Services
     public class AutoLaunchService : IDisposable
     {
         private readonly DispatcherTimer _timer;
+        private readonly DispatcherTimer _monitorTimer;
         private readonly LaunchService _launchService;
         private readonly ServerQueryService _queryService;
         private readonly ConfigService _configService;
@@ -18,6 +19,8 @@ namespace L9HLL.Launcher.Services
         private readonly Dispatcher _dispatcher;
         private bool _triggeredToday;
         private DateTime _lastDate;
+        private ServerInfo? _launchedServer;
+        private bool _seededDialogShown;
 
         public bool Enabled
         {
@@ -86,88 +89,121 @@ namespace L9HLL.Launcher.Services
             if (currentTime >= target && currentTime < target + TimeSpan.FromSeconds(30))
             {
                 _triggeredToday = true;
-                CheckAndLaunch();
+                Task.Run(() => CheckAndLaunchAsync());
             }
         }
 
-        private async void CheckAndLaunch()
+        private async Task CheckAndLaunchAsync()
         {
-            if (IsGameRunning(true))
+            try
             {
-                UpdateStatus("Auto-Launch skipped: Vietnam already running");
-                return;
-            }
+                if (IsGameRunning(true))
+                {
+                    UpdateStatus("Auto-Launch skipped: Vietnam already running");
+                    return;
+                }
 
-            if (IsGameRunning(false))
-            {
-                UpdateStatus("Auto-Launch skipped: WW2 already running");
-                return;
-            }
+                if (IsGameRunning(false))
+                {
+                    UpdateStatus("Auto-Launch skipped: WW2 already running");
+                    return;
+                }
 
-            UpdateStatus("Auto-Launch: querying servers...");
+                UpdateStatus("Auto-Launch: querying servers...");
 
-            var server1Info = new ServerInfo
-            {
-                Name = "[L9] The Loyal Nine |#1|",
-                Ip = "40.27.41.16",
-                Port = 7777,
-                Game = "hll"
-            };
-            var server2Info = new ServerInfo
-            {
-                Name = "[L9] The Loyal Nine |#2|",
-                Ip = "40.27.41.9",
-                Port = 7777,
-                Game = "hll"
-            };
-
-            var (r1, _) = await _queryService.QueryAsync(server1Info);
-            var (r2, _) = await _queryService.QueryAsync(server2Info);
-
-            ServerStatus server;
-
-            if (r1.IsOnline && r1.PlayerCount < 60)
-            {
-                server = r1;
-            }
-            else if (r2.IsOnline)
-            {
-                server = r2;
-            }
-            else
-            {
-                server = new ServerStatus
+                var server1Info = new ServerInfo
                 {
                     Name = "[L9] The Loyal Nine |#1|",
                     Ip = "40.27.41.16",
                     Port = 7777,
                     Game = "hll"
                 };
-            }
-
-            _dispatcher.Invoke(() =>
-            {
-                try
+                var server2Info = new ServerInfo
                 {
-                    var dialog = new AutoLaunchDialog(server.Name);
-                    dialog.ShowDialog();
+                    Name = "[L9] The Loyal Nine |#2|",
+                    Ip = "40.27.41.9",
+                    Port = 7777,
+                    Game = "hll"
+                };
 
+                var (r1, _) = await _queryService.QueryAsync(server1Info);
+                var (r2, _) = await _queryService.QueryAsync(server2Info);
+
+                ServerStatus server;
+
+                if (r1.IsOnline && r1.PlayerCount < 60)
+                {
+                    server = r1;
+                }
+                else if (r2.IsOnline)
+                {
+                    server = r2;
+                }
+                else
+                {
+                    server = new ServerStatus
+                    {
+                        Name = "[L9] The Loyal Nine |#1|",
+                        Ip = "40.27.41.16",
+                        Port = 7777,
+                        Game = "hll"
+                    };
+                }
+
+                // Show dialog on UI thread
+                _dispatcher.Invoke(() => ShowAutoLaunchDialog(server));
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+                UpdateStatus($"Auto-Launch error: {ex.Message}");
+            }
+        }
+
+        private void ShowAutoLaunchDialog(ServerStatus server)
+        {
+            try
+            {
+                // Restore main window first so dialog has a visible owner
+                var mw = Application.Current.MainWindow;
+                if (mw != null && !mw.IsVisible)
+                {
+                    mw.Show();
+                    mw.WindowState = WindowState.Normal;
+                    mw.Activate();
+                }
+
+                var dialog = new AutoLaunchDialog(server.Name);
+                dialog.Closed += (s, e) =>
+                {
                     if (!dialog.WasCancelled)
                     {
                         UpdateStatus($"Auto-launching {server.Name}...");
+                        _launchedServer = new ServerInfo
+                        {
+                            Name = server.Name,
+                            Ip = server.Ip,
+                            Port = server.Port,
+                            Game = server.Game
+                        };
+                        _seededDialogShown = false;
+                        StartSeedingMonitor();
                         _launchService.LaunchServer(server);
                     }
                     else
                     {
                         UpdateStatus("Auto-Launch cancelled");
                     }
-                }
-                catch (Exception ex)
-                {
-                    ConfigService.LogError(ex);
-                    UpdateStatus($"Auto-Launch error: {ex.Message}");
-                }
-            });
+                };
+                dialog.Show();
+                dialog.Activate();
+                dialog.Focus();
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+                UpdateStatus($"Auto-Launch dialog error: {ex.Message}");
+            }
         }
 
         private bool IsGameRunning(bool isVietnam)
@@ -194,12 +230,56 @@ namespace L9HLL.Launcher.Services
 
         private void UpdateStatus(string message)
         {
-            _onStatus?.Invoke(message);
+            _dispatcher.Invoke(() => _onStatus?.Invoke(message));
+        }
+
+        private void StartSeedingMonitor()
+        {
+            _monitorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+            _monitorTimer.Tick += OnMonitorTick;
+            _monitorTimer.Start();
+        }
+
+        private async void OnMonitorTick(object? sender, EventArgs e)
+        {
+            if (_launchedServer == null || _seededDialogShown) return;
+
+            try
+            {
+                var (status, _) = await _queryService.QueryAsync(_launchedServer);
+                if (status.PlayerCount >= 90)
+                {
+                    _monitorTimer.Stop();
+                    _seededDialogShown = true;
+                    UpdateStatus($"Server seeded! {status.PlayerCount}/{status.MaxPlayers} players");
+
+                    var dialog = new ServerSeededDialog();
+                    dialog.Closed += (s, e) =>
+                    {
+                        if (!dialog.WasCancelled)
+                        {
+                            UpdateStatus("Seeding timer expired. Closing game.");
+                            _launchService.CloseGame();
+                        }
+                        else
+                        {
+                            UpdateStatus("Player chose to keep playing.");
+                        }
+                    };
+                    dialog.Show();
+                    dialog.Activate();
+                }
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
         }
 
         public void Dispose()
         {
             _timer.Stop();
+            _monitorTimer?.Stop();
         }
     }
 }

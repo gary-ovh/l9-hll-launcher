@@ -230,12 +230,13 @@ namespace L9HLL.Launcher.Services
         {
             try
             {
-                if (_mainWindow.IsLoaded)
+                _mainWindow.Dispatcher.Invoke(() =>
                 {
                     _mainWindow.Show();
                     _mainWindow.WindowState = WindowState.Normal;
                     _mainWindow.Activate();
-                }
+                    _mainWindow.BringIntoView();
+                });
             }
             catch (Exception ex)
             {

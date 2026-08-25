@@ -272,6 +272,42 @@ namespace L9HLL.Launcher.Services
             return null;
         }
 
+        public void CloseGame()
+        {
+            try
+            {
+                string[] processNames =
+                {
+                    "HLL-Win64-Shipping", "HLL",
+                    "HLLVietnam-Win64-Shipping", "HLLVietnam"
+                };
+
+                foreach (var name in processNames)
+                {
+                    try
+                    {
+                        var processes = Process.GetProcessesByName(name);
+                        foreach (var proc in processes)
+                        {
+                            if (!proc.HasExited)
+                            {
+                                proc.Kill();
+                                proc.WaitForExit(3000);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        ConfigService.LogError(ex);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
+        }
+
         private static string? FindSteamPath()
         {
             try

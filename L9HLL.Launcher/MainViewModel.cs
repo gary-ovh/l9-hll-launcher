@@ -163,6 +163,7 @@ namespace L9HLL.Launcher
         {
             try
             {
+                RestoreMainWindowIfNeeded();
                 var dialog = new SettingsDialog(
                     _configService,
                     _updateService!,

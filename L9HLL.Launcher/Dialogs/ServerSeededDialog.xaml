@@ -1,0 +1,37 @@
+<Window x:Class="L9HLL.Launcher.Dialogs.ServerSeededDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Server Seeded"
+        Height="280" Width="340"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="#1a1a1a"
+        Foreground="#e0e0e0"
+        FontFamily="Segoe UI">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="100"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Server Is Seeded!" FontSize="16" FontWeight="SemiBold"
+                   HorizontalAlignment="Center" Margin="0,0,0,8"/>
+
+        <TextBlock Grid.Row="1" Text="90/100 players reached" FontSize="13" Foreground="#ccc"
+                   HorizontalAlignment="Center" Margin="0,0,0,12"/>
+
+        <TextBlock Grid.Row="2" x:Name="CountDownText" FontSize="56" FontWeight="Bold"
+                   Foreground="White" HorizontalAlignment="Center"
+                   VerticalAlignment="Center"/>
+
+        <TextBlock Grid.Row="2" Text="seconds remaining" FontSize="11" Foreground="#888"
+                   HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,4"/>
+
+        <Button Grid.Row="3" x:Name="KeepPlayingBtn" Content="Keep Playing" Width="140" Height="36"
+                HorizontalAlignment="Center" Margin="0,16,0,0"
+                Background="#2d7a2d" Foreground="White" BorderBrush="#2d7a2d"
+                FontSize="14" Cursor="Hand" Click="KeepPlayingBtn_Click"/>
+    </Grid>
+</Window>

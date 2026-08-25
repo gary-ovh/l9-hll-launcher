@@ -28,11 +28,14 @@ namespace L9HLL.Launcher
 
             SetIconFromResource();
 
-            var settings = viewModel.ConfigService.LoadSettings();
-            if (settings.StartMinimized)
+            Loaded += (s, e) =>
             {
-                Hide();
-            }
+                var settings = viewModel.ConfigService.LoadSettings();
+                if (settings.StartMinimized)
+                {
+                    Hide();
+                }
+            };
 
             MinimizeBtn.MouseEnter += (s, e) => MinimizeBtn.Foreground = new SolidColorBrush(System.Windows.Media.Colors.White);
             MinimizeBtn.MouseLeave += (s, e) => MinimizeBtn.Foreground = new SolidColorBrush(System.Windows.Media.Colors.LightGray);

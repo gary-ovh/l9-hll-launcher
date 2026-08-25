@@ -14,8 +14,7 @@ namespace L9HLL.Launcher.Dialogs
 
         public TimePickerDialog(int defaultHour = 22, int defaultMinute = 0)
         {
-            InitializeComponent();
-            Owner = Application.Current.MainWindow;
+InitializeComponent();
 
             for (int i = 0; i < 24; i++)
             {

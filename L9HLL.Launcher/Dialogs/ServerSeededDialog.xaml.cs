@@ -4,17 +4,16 @@ using System.Windows.Threading;
 
 namespace L9HLL.Launcher.Dialogs
 {
-    public partial class AutoLaunchDialog : Window
+    public partial class ServerSeededDialog : Window
     {
         private readonly DispatcherTimer _timer;
-        private int _remaining = 30;
+        private int _remaining = 60;
         public bool WasCancelled { get; private set; }
 
-        public AutoLaunchDialog(string serverName)
+        public ServerSeededDialog()
         {
             InitializeComponent();
 
-            ServerNameText.Text = serverName;
             CountDownText.Text = $"{_remaining}s";
 
             _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -33,7 +32,7 @@ namespace L9HLL.Launcher.Dialogs
             Loaded += (s, e) => _timer.Start();
         }
 
-        private void CancelBtn_Click(object sender, RoutedEventArgs e)
+        private void KeepPlayingBtn_Click(object sender, RoutedEventArgs e)
         {
             _timer.Stop();
             WasCancelled = true;
