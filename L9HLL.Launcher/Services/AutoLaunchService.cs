@@ -11,7 +11,7 @@ namespace L9HLL.Launcher.Services
     public class AutoLaunchService : IDisposable
     {
         private readonly DispatcherTimer _timer;
-        private readonly DispatcherTimer _monitorTimer;
+        private DispatcherTimer? _monitorTimer;
         private readonly LaunchService _launchService;
         private readonly ServerQueryService _queryService;
         private readonly ConfigService _configService;

@@ -163,7 +163,13 @@ namespace L9HLL.Launcher
         {
             try
             {
-                RestoreMainWindowIfNeeded();
+                var mw = System.Windows.Application.Current.MainWindow;
+                if (mw != null && !mw.IsVisible)
+                {
+                    mw.Show();
+                    mw.WindowState = System.Windows.WindowState.Normal;
+                    mw.Activate();
+                }
                 var dialog = new SettingsDialog(
                     _configService,
                     _updateService!,
