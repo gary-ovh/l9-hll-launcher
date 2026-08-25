@@ -150,7 +150,7 @@ namespace L9HLL.Launcher.Services
                     };
                 }
 
-                // Marshal dialog show to UI thread
+                // Show dialog on UI thread
                 _dispatcher.Invoke(() => ShowAutoLaunchDialog(server));
             }
             catch (Exception ex)
@@ -164,6 +164,15 @@ namespace L9HLL.Launcher.Services
         {
             try
             {
+                // Restore main window first so dialog has a visible owner
+                var mw = Application.Current.MainWindow;
+                if (mw != null && !mw.IsVisible)
+                {
+                    mw.Show();
+                    mw.WindowState = WindowState.Normal;
+                    mw.Activate();
+                }
+
                 var dialog = new AutoLaunchDialog(server.Name);
                 dialog.Closed += (s, e) =>
                 {
@@ -186,7 +195,9 @@ namespace L9HLL.Launcher.Services
                         UpdateStatus("Auto-Launch cancelled");
                     }
                 };
-                dialog.ShowDialog();
+                dialog.Show();
+                dialog.Activate();
+                dialog.Focus();
             }
             catch (Exception ex)
             {
@@ -255,7 +266,8 @@ namespace L9HLL.Launcher.Services
                             UpdateStatus("Player chose to keep playing.");
                         }
                     };
-                    dialog.ShowDialog();
+                    dialog.Show();
+                    dialog.Activate();
                 }
             }
             catch (Exception ex)
