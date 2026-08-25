@@ -148,14 +148,27 @@ namespace L9HLL.Launcher.Services
                 };
             }
 
-            _dispatcher.Invoke(() =>
+            ShowAutoLaunchDialogAsync(server);
+        }
+
+        private void ShowAutoLaunchDialogAsync(ServerStatus server)
+        {
+            _dispatcher.BeginInvoke(new Action(async () =>
             {
                 try
                 {
+                    var tcs = new TaskCompletionSource<bool>();
                     var dialog = new AutoLaunchDialog(server.Name);
-                    dialog.ShowDialog();
+                    dialog.Closed += (s, e) =>
+                    {
+                        tcs.TrySetResult(!dialog.WasCancelled);
+                    };
+                    dialog.Show();
+                    dialog.Focus();
 
-                    if (!dialog.WasCancelled)
+                    var launched = await tcs.Task;
+
+                    if (launched)
                     {
                         UpdateStatus($"Auto-launching {server.Name}...");
                         _launchedServer = new ServerInfo
@@ -179,7 +192,7 @@ namespace L9HLL.Launcher.Services
                     ConfigService.LogError(ex);
                     UpdateStatus($"Auto-Launch error: {ex.Message}");
                 }
-            });
+            }));
         }
 
         private bool IsGameRunning(bool isVietnam)
@@ -216,10 +229,15 @@ namespace L9HLL.Launcher.Services
             _monitorTimer.Start();
         }
 
-        private async void OnMonitorTick(object? sender, EventArgs e)
+        private void OnMonitorTick(object? sender, EventArgs e)
         {
             if (_launchedServer == null || _seededDialogShown) return;
 
+            QueryServerAndCheckSeeded();
+        }
+
+        private async void QueryServerAndCheckSeeded()
+        {
             try
             {
                 var (status, _) = await _queryService.QueryAsync(_launchedServer);
@@ -229,34 +247,47 @@ namespace L9HLL.Launcher.Services
                     _seededDialogShown = true;
                     UpdateStatus($"Server seeded! {status.PlayerCount}/{status.MaxPlayers} players");
 
-                    _dispatcher.Invoke(() =>
-                    {
-                        try
-                        {
-                            var dialog = new ServerSeededDialog();
-                            dialog.ShowDialog();
-
-                            if (!dialog.WasCancelled)
-                            {
-                                UpdateStatus("Seeding timer expired. Closing game.");
-                                _launchService.CloseGame();
-                            }
-                            else
-                            {
-                                UpdateStatus("Player chose to keep playing.");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            ConfigService.LogError(ex);
-                        }
-                    });
+                    ShowSeededDialogAsync();
                 }
             }
             catch (Exception ex)
             {
                 ConfigService.LogError(ex);
             }
+        }
+
+        private void ShowSeededDialogAsync()
+        {
+            _dispatcher.BeginInvoke(new Action(async () =>
+            {
+                try
+                {
+                    var tcs = new TaskCompletionSource<bool>();
+                    var dialog = new ServerSeededDialog();
+                    dialog.Closed += (s, e) =>
+                    {
+                        tcs.TrySetResult(!dialog.WasCancelled);
+                    };
+                    dialog.Show();
+                    dialog.Focus();
+
+                    var timerExpired = await tcs.Task;
+
+                    if (timerExpired)
+                    {
+                        UpdateStatus("Seeding timer expired. Closing game.");
+                        _launchService.CloseGame();
+                    }
+                    else
+                    {
+                        UpdateStatus("Player chose to keep playing.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ConfigService.LogError(ex);
+                }
+            }));
         }
 
         public void Dispose()
