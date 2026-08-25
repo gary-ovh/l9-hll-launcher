@@ -3,17 +3,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Settings"
         Height="420" Width="440"
-        WindowStartupLocation="CenterOwner"
+        WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="Transparent"
         Foreground="#e0e0e0"
         FontFamily="Segoe UI"
-        WindowStyle="None"
-        AllowsTransparency="True"
-        PreviewMouseLeftButtonDown="Window_PreviewMouseLeftButtonDown">
-    <WindowChrome.WindowChrome>
-        <WindowChrome GlassFrameThickness="0" CaptionHeight="0" CornerRadius="8"/>
-    </WindowChrome.WindowChrome>
+WindowStyle="None"
+        AllowsTransparency="True">
 
     <Border Background="#1a1a1a" CornerRadius="8" BorderBrush="#444" BorderThickness="1">
         <Grid>
@@ -22,7 +18,8 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Background="#111" BorderBrush="#333" BorderThickness="0,0,0,1">
+            <Border x:Name="TitleBar" Grid.Row="0" Background="#111" BorderBrush="#333" BorderThickness="0,0,0,1"
+                MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid Margin="12,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>

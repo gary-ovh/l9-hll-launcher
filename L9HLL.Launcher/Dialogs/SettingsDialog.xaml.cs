@@ -1,6 +1,8 @@
 using System;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using L9HLL.Launcher.Services;
 
 namespace L9HLL.Launcher.Dialogs
@@ -19,7 +21,6 @@ namespace L9HLL.Launcher.Dialogs
             Action onSettingsChanged)
         {
             InitializeComponent();
-            Owner = Application.Current.MainWindow;
             _config = config;
             _updateService = updateService;
             _autoLaunch = autoLaunch;
@@ -166,6 +167,6 @@ namespace L9HLL.Launcher.Dialogs
 
         private void CloseBtn_Click(object sender, RoutedEventArgs e) => Close();
 
-        private void Window_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) => DragMove();
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => DragMove();
     }
 }

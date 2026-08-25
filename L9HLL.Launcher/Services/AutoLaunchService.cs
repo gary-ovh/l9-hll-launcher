@@ -11,6 +11,7 @@ namespace L9HLL.Launcher.Services
     public class AutoLaunchService : IDisposable
     {
         private readonly DispatcherTimer _timer;
+        private readonly DispatcherTimer _monitorTimer;
         private readonly LaunchService _launchService;
         private readonly ServerQueryService _queryService;
         private readonly ConfigService _configService;
@@ -18,6 +19,8 @@ namespace L9HLL.Launcher.Services
         private readonly Dispatcher _dispatcher;
         private bool _triggeredToday;
         private DateTime _lastDate;
+        private ServerInfo? _launchedServer;
+        private bool _seededDialogShown;
 
         public bool Enabled
         {
@@ -155,6 +158,15 @@ namespace L9HLL.Launcher.Services
                     if (!dialog.WasCancelled)
                     {
                         UpdateStatus($"Auto-launching {server.Name}...");
+                        _launchedServer = new ServerInfo
+                        {
+                            Name = server.Name,
+                            Ip = server.Ip,
+                            Port = server.Port,
+                            Game = server.Game
+                        };
+                        _seededDialogShown = false;
+                        StartSeedingMonitor();
                         _launchService.LaunchServer(server);
                     }
                     else
@@ -197,9 +209,60 @@ namespace L9HLL.Launcher.Services
             _onStatus?.Invoke(message);
         }
 
+        private void StartSeedingMonitor()
+        {
+            _monitorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+            _monitorTimer.Tick += OnMonitorTick;
+            _monitorTimer.Start();
+        }
+
+        private async void OnMonitorTick(object? sender, EventArgs e)
+        {
+            if (_launchedServer == null || _seededDialogShown) return;
+
+            try
+            {
+                var (status, _) = await _queryService.QueryAsync(_launchedServer);
+                if (status.PlayerCount >= 90)
+                {
+                    _monitorTimer.Stop();
+                    _seededDialogShown = true;
+                    UpdateStatus($"Server seeded! {status.PlayerCount}/{status.MaxPlayers} players");
+
+                    _dispatcher.Invoke(() =>
+                    {
+                        try
+                        {
+                            var dialog = new ServerSeededDialog();
+                            dialog.ShowDialog();
+
+                            if (!dialog.WasCancelled)
+                            {
+                                UpdateStatus("Seeding timer expired. Closing game.");
+                                _launchService.CloseGame();
+                            }
+                            else
+                            {
+                                UpdateStatus("Player chose to keep playing.");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            ConfigService.LogError(ex);
+                        }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
+        }
+
         public void Dispose()
         {
             _timer.Stop();
+            _monitorTimer?.Stop();
         }
     }
 }
