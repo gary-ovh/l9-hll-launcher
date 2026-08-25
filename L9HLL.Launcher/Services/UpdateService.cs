@@ -118,23 +118,44 @@ namespace L9HLL.Launcher.Services
                     exeEntry.Open().CopyTo(exeStream);
 
                     var exeDir = AppDomain.CurrentDomain.BaseDirectory;
+                    var oldExePath = Path.Combine(exeDir, "L9HLL.Launcher.exe");
                     var batchPath = Path.Combine(exeDir, "update.bat");
 
                     var batLines = new[]
                     {
                         "@echo off",
+                        "setlocal",
+                        "set EXE_DIR=" + exeDir,
+                        "set OLD_EXE=%EXE_DIR%\L9HLL.Launcher.exe",
+                        $"set NEW_EXE={tempExe}",
+                        $"set ZIP_PATH={tempZip}",
+                        "",
+                        ":wait_for_exit",
+                        "tasklist /FI \"IMAGENAME eq L9HLL.Launcher.exe\" 2>nul | find /i /n \"L9HLL.Launcher.exe\">nul",
+                        "if not errorlevel 1 goto wait_for_exit",
+                        "",
                         "timeout /t 2 /nobreak >nul",
-                        $"copy /Y \"{tempExe}\" \"L9HLL.Launcher.exe\"",
-                        $"del \"{tempZip}\"",
-                        $"del \"{tempExe}\"",
-                        "del update.bat",
-                        "start \"\" \"L9HLL.Launcher.exe\"",
                         "taskkill /F /IM L9HLL.Launcher.exe >nul 2>&1",
+                        "",
+                        "copy /Y \"%NEW_EXE%\" \"%OLD_EXE%\"",
+                        "if not errorlevel 1 (",
+                        "    start \"\" \"%OLD_EXE%\"",
+                        ")",
+                        "del \"%NEW_EXE%\"",
+                        "del \"%ZIP_PATH%\"",
+                        "del \"%EXE_DIR%\update.bat\"",
                         "exit"
                     };
                     File.WriteAllLines(batchPath, batLines);
 
-                    Process.Start(batchPath);
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = batchPath,
+                        WindowStyle = ProcessWindowStyle.Hidden,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+                    Process.Start(psi);
                     System.Windows.Application.Current.Shutdown();
                 }
                 catch (Exception ex)
