@@ -150,32 +150,39 @@ namespace L9HLL.Launcher.Services
                 };
             }
 
-            var dialog = new AutoLaunchDialog(server.Name);
-            _pendingDialog = dialog;
-            dialog.Closed += (s, e) =>
+            try
             {
-                _pendingDialog = null;
-            {
-                if (!dialog.WasCancelled)
+                var dialog = new AutoLaunchDialog(server.Name);
+                _pendingDialog = dialog;
+                dialog.Closed += (s, e) =>
                 {
-                    UpdateStatus($"Auto-launching {server.Name}...");
-                    _launchedServer = new ServerInfo
+                    _pendingDialog = null;
+                    if (!dialog.WasCancelled)
                     {
-                        Name = server.Name,
-                        Ip = server.Ip,
-                        Port = server.Port,
-                        Game = server.Game
-                    };
-                    _seededDialogShown = false;
-                    StartSeedingMonitor();
-                    _launchService.LaunchServer(server);
-                }
-                else
-                {
-                    UpdateStatus("Auto-Launch cancelled");
-                }
-            };
-            dialog.Show();
+                        UpdateStatus($"Auto-launching {server.Name}...");
+                        _launchedServer = new ServerInfo
+                        {
+                            Name = server.Name,
+                            Ip = server.Ip,
+                            Port = server.Port,
+                            Game = server.Game
+                        };
+                        _seededDialogShown = false;
+                        StartSeedingMonitor();
+                        _launchService.LaunchServer(server);
+                    }
+                    else
+                    {
+                        UpdateStatus("Auto-Launch cancelled");
+                    }
+                };
+                dialog.Show();
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+                UpdateStatus($"Auto-Launch dialog error: {ex.Message}");
+            }
         }
 
         private bool IsGameRunning(bool isVietnam)
@@ -230,7 +237,6 @@ namespace L9HLL.Launcher.Services
                     dialog.Closed += (s, e) =>
                     {
                         _seededDialog = null;
-                    {
                         if (!dialog.WasCancelled)
                         {
                             UpdateStatus("Seeding timer expired. Closing game.");
