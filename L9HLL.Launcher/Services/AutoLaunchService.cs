@@ -148,51 +148,29 @@ namespace L9HLL.Launcher.Services
                 };
             }
 
-            ShowAutoLaunchDialogAsync(server);
-        }
-
-        private void ShowAutoLaunchDialogAsync(ServerStatus server)
-        {
-            _dispatcher.BeginInvoke(new Action(async () =>
+            var dialog = new AutoLaunchDialog(server.Name);
+            dialog.Closed += (s, e) =>
             {
-                try
+                if (!dialog.WasCancelled)
                 {
-                    var tcs = new TaskCompletionSource<bool>();
-                    var dialog = new AutoLaunchDialog(server.Name);
-                    dialog.Closed += (s, e) =>
+                    UpdateStatus($"Auto-launching {server.Name}...");
+                    _launchedServer = new ServerInfo
                     {
-                        tcs.TrySetResult(!dialog.WasCancelled);
+                        Name = server.Name,
+                        Ip = server.Ip,
+                        Port = server.Port,
+                        Game = server.Game
                     };
-                    dialog.Show();
-                    dialog.Focus();
-
-                    var launched = await tcs.Task;
-
-                    if (launched)
-                    {
-                        UpdateStatus($"Auto-launching {server.Name}...");
-                        _launchedServer = new ServerInfo
-                        {
-                            Name = server.Name,
-                            Ip = server.Ip,
-                            Port = server.Port,
-                            Game = server.Game
-                        };
-                        _seededDialogShown = false;
-                        StartSeedingMonitor();
-                        _launchService.LaunchServer(server);
-                    }
-                    else
-                    {
-                        UpdateStatus("Auto-Launch cancelled");
-                    }
+                    _seededDialogShown = false;
+                    StartSeedingMonitor();
+                    _launchService.LaunchServer(server);
                 }
-                catch (Exception ex)
+                else
                 {
-                    ConfigService.LogError(ex);
-                    UpdateStatus($"Auto-Launch error: {ex.Message}");
+                    UpdateStatus("Auto-Launch cancelled");
                 }
-            }));
+            };
+            dialog.Show();
         }
 
         private bool IsGameRunning(bool isVietnam)
@@ -229,15 +207,10 @@ namespace L9HLL.Launcher.Services
             _monitorTimer.Start();
         }
 
-        private void OnMonitorTick(object? sender, EventArgs e)
+        private async void OnMonitorTick(object? sender, EventArgs e)
         {
             if (_launchedServer == null || _seededDialogShown) return;
 
-            QueryServerAndCheckSeeded();
-        }
-
-        private async void QueryServerAndCheckSeeded()
-        {
             try
             {
                 var (status, _) = await _queryService.QueryAsync(_launchedServer);
@@ -247,47 +220,26 @@ namespace L9HLL.Launcher.Services
                     _seededDialogShown = true;
                     UpdateStatus($"Server seeded! {status.PlayerCount}/{status.MaxPlayers} players");
 
-                    ShowSeededDialogAsync();
+                    var dialog = new ServerSeededDialog();
+                    dialog.Closed += (s, e) =>
+                    {
+                        if (!dialog.WasCancelled)
+                        {
+                            UpdateStatus("Seeding timer expired. Closing game.");
+                            _launchService.CloseGame();
+                        }
+                        else
+                        {
+                            UpdateStatus("Player chose to keep playing.");
+                        }
+                    };
+                    dialog.Show();
                 }
             }
             catch (Exception ex)
             {
                 ConfigService.LogError(ex);
             }
-        }
-
-        private void ShowSeededDialogAsync()
-        {
-            _dispatcher.BeginInvoke(new Action(async () =>
-            {
-                try
-                {
-                    var tcs = new TaskCompletionSource<bool>();
-                    var dialog = new ServerSeededDialog();
-                    dialog.Closed += (s, e) =>
-                    {
-                        tcs.TrySetResult(!dialog.WasCancelled);
-                    };
-                    dialog.Show();
-                    dialog.Focus();
-
-                    var timerExpired = await tcs.Task;
-
-                    if (timerExpired)
-                    {
-                        UpdateStatus("Seeding timer expired. Closing game.");
-                        _launchService.CloseGame();
-                    }
-                    else
-                    {
-                        UpdateStatus("Player chose to keep playing.");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    ConfigService.LogError(ex);
-                }
-            }));
         }
 
         public void Dispose()
