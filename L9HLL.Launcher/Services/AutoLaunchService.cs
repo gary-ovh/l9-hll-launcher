@@ -22,6 +22,7 @@ namespace L9HLL.Launcher.Services
         private ServerInfo? _launchedServer;
         private bool _seededDialogShown;
         private AutoLaunchDialog? _pendingDialog;
+        private ServerSeededDialog? _seededDialog;
 
         public bool Enabled
         {
@@ -225,7 +226,10 @@ namespace L9HLL.Launcher.Services
                     UpdateStatus($"Server seeded! {status.PlayerCount}/{status.MaxPlayers} players");
 
                     var dialog = new ServerSeededDialog();
+                    _seededDialog = dialog;
                     dialog.Closed += (s, e) =>
+                    {
+                        _seededDialog = null;
                     {
                         if (!dialog.WasCancelled)
                         {
