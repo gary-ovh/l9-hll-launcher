@@ -21,8 +21,6 @@ namespace L9HLL.Launcher.Services
         private DateTime _lastDate;
         private ServerInfo? _launchedServer;
         private bool _seededDialogShown;
-        private AutoLaunchDialog? _pendingDialog;
-        private ServerSeededDialog? _seededDialog;
 
         public bool Enabled
         {
@@ -91,72 +89,84 @@ namespace L9HLL.Launcher.Services
             if (currentTime >= target && currentTime < target + TimeSpan.FromSeconds(30))
             {
                 _triggeredToday = true;
-                CheckAndLaunch();
+                Task.Run(() => CheckAndLaunchAsync());
             }
         }
 
-        private async void CheckAndLaunch()
+        private async Task CheckAndLaunchAsync()
         {
-            if (IsGameRunning(true))
+            try
             {
-                UpdateStatus("Auto-Launch skipped: Vietnam already running");
-                return;
-            }
+                if (IsGameRunning(true))
+                {
+                    UpdateStatus("Auto-Launch skipped: Vietnam already running");
+                    return;
+                }
 
-            if (IsGameRunning(false))
-            {
-                UpdateStatus("Auto-Launch skipped: WW2 already running");
-                return;
-            }
+                if (IsGameRunning(false))
+                {
+                    UpdateStatus("Auto-Launch skipped: WW2 already running");
+                    return;
+                }
 
-            UpdateStatus("Auto-Launch: querying servers...");
+                UpdateStatus("Auto-Launch: querying servers...");
 
-            var server1Info = new ServerInfo
-            {
-                Name = "[L9] The Loyal Nine |#1|",
-                Ip = "40.27.41.16",
-                Port = 7777,
-                Game = "hll"
-            };
-            var server2Info = new ServerInfo
-            {
-                Name = "[L9] The Loyal Nine |#2|",
-                Ip = "40.27.41.9",
-                Port = 7777,
-                Game = "hll"
-            };
-
-            var (r1, _) = await _queryService.QueryAsync(server1Info);
-            var (r2, _) = await _queryService.QueryAsync(server2Info);
-
-            ServerStatus server;
-
-            if (r1.IsOnline && r1.PlayerCount < 60)
-            {
-                server = r1;
-            }
-            else if (r2.IsOnline)
-            {
-                server = r2;
-            }
-            else
-            {
-                server = new ServerStatus
+                var server1Info = new ServerInfo
                 {
                     Name = "[L9] The Loyal Nine |#1|",
                     Ip = "40.27.41.16",
                     Port = 7777,
                     Game = "hll"
                 };
-            }
+                var server2Info = new ServerInfo
+                {
+                    Name = "[L9] The Loyal Nine |#2|",
+                    Ip = "40.27.41.9",
+                    Port = 7777,
+                    Game = "hll"
+                };
 
+                var (r1, _) = await _queryService.QueryAsync(server1Info);
+                var (r2, _) = await _queryService.QueryAsync(server2Info);
+
+                ServerStatus server;
+
+                if (r1.IsOnline && r1.PlayerCount < 60)
+                {
+                    server = r1;
+                }
+                else if (r2.IsOnline)
+                {
+                    server = r2;
+                }
+                else
+                {
+                    server = new ServerStatus
+                    {
+                        Name = "[L9] The Loyal Nine |#1|",
+                        Ip = "40.27.41.16",
+                        Port = 7777,
+                        Game = "hll"
+                    };
+                }
+
+                // Marshal dialog show to UI thread
+                _dispatcher.Invoke(() => ShowAutoLaunchDialog(server));
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+                UpdateStatus($"Auto-Launch error: {ex.Message}");
+            }
+        }
+
+        private void ShowAutoLaunchDialog(ServerStatus server)
+        {
             try
             {
                 var dialog = new AutoLaunchDialog(server.Name);
-                _pendingDialog = dialog;
                 dialog.Closed += (s, e) =>
                 {
-                    _pendingDialog = null;
                     if (!dialog.WasCancelled)
                     {
                         UpdateStatus($"Auto-launching {server.Name}...");
@@ -176,7 +186,7 @@ namespace L9HLL.Launcher.Services
                         UpdateStatus("Auto-Launch cancelled");
                     }
                 };
-                dialog.Show();
+                dialog.ShowDialog();
             }
             catch (Exception ex)
             {
@@ -209,7 +219,7 @@ namespace L9HLL.Launcher.Services
 
         private void UpdateStatus(string message)
         {
-            _onStatus?.Invoke(message);
+            _dispatcher.Invoke(() => _onStatus?.Invoke(message));
         }
 
         private void StartSeedingMonitor()
@@ -233,10 +243,8 @@ namespace L9HLL.Launcher.Services
                     UpdateStatus($"Server seeded! {status.PlayerCount}/{status.MaxPlayers} players");
 
                     var dialog = new ServerSeededDialog();
-                    _seededDialog = dialog;
                     dialog.Closed += (s, e) =>
                     {
-                        _seededDialog = null;
                         if (!dialog.WasCancelled)
                         {
                             UpdateStatus("Seeding timer expired. Closing game.");
@@ -247,7 +255,7 @@ namespace L9HLL.Launcher.Services
                             UpdateStatus("Player chose to keep playing.");
                         }
                     };
-                    dialog.Show();
+                    dialog.ShowDialog();
                 }
             }
             catch (Exception ex)
