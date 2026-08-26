@@ -146,9 +146,11 @@ namespace L9HLL.Launcher.Services
                     var finalBatPath = oldExePath.Replace(".exe", ".bat");
                     File.WriteAllLines(finalBatPath, batLines);
 
+                    // UseShellExecute=false cannot run .bat files; must use cmd.exe /c
                     var psi = new ProcessStartInfo
                     {
-                        FileName = finalBatPath,
+                        FileName = "cmd.exe",
+                        Arguments = $"/c \"{finalBatPath}\"",
                         WindowStyle = ProcessWindowStyle.Hidden,
                         UseShellExecute = false,
                         CreateNoWindow = true
