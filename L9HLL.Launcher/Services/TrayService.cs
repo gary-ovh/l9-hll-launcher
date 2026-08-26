@@ -182,24 +182,22 @@ namespace L9HLL.Launcher.Services
                     Game = server.Game
                 };
 
-                var (status, _) = await _queryService.QueryAsync(serverInfo);
+                // Run query on background thread, get result synchronously
+                var result = await Task.Run(() => _queryService.QueryAsync(serverInfo));
+                var status = result.Item1;
 
-                // Marshal back to UI thread for all remaining work
-                _contextMenu.Invoke((Action)(() =>
+                if (status.IsOnline)
                 {
-                    if (status.IsOnline)
-                    {
-                        SetItemText(item, $"[L9] {server.Name} ({status.PlayerCount}/{status.MaxPlayers})");
-                        EnableItem(item);
-                        _launchService.LaunchServer(server);
-                    }
-                    else
-                    {
-                        SetItemText(item, $"[L9] {server.Name} (Offline)");
-                        DisableItem(item);
-                        item.ForeColor = Color.FromArgb(100, 100, 100);
-                    }
-                }));
+                    SetItemText(item, $"[L9] {server.Name} ({status.PlayerCount}/{status.MaxPlayers})");
+                    EnableItem(item);
+                    _launchService.LaunchServer(server);
+                }
+                else
+                {
+                    SetItemText(item, $"[L9] {server.Name} (Offline)");
+                    DisableItem(item);
+                    item.ForeColor = Color.FromArgb(100, 100, 100);
+                }
             }
             catch (Exception ex)
             {
