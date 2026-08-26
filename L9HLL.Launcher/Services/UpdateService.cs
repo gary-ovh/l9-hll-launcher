@@ -156,7 +156,8 @@ namespace L9HLL.Launcher.Services
                         CreateNoWindow = true
                     };
                     Process.Start(psi);
-                    System.Windows.Application.Current.Shutdown();
+                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                        System.Windows.Application.Current.Shutdown());
                 }
                 catch (Exception ex)
                 {

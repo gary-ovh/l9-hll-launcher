@@ -128,7 +128,24 @@ namespace L9HLL.Launcher
                 {
                     return;
                 }
-                source = VisualTreeHelper.GetParent(source);
+
+                if (source is System.Windows.Documents.Run ||
+                    source is System.Windows.Documents.TextPointer ||
+                    source is System.Windows.Documents.Paragraph ||
+                    source is System.Windows.Documents.FlowDocument)
+                {
+                    break;
+                }
+
+                if (source is System.Windows.Media.Visual ||
+                    source is System.Windows.Media.Media3D.Visual3D)
+                {
+                    source = System.Windows.Media.VisualTreeHelper.GetParent(source);
+                }
+                else
+                {
+                    break;
+                }
             }
             DragMove();
         }
