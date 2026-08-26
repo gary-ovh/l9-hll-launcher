@@ -157,7 +157,7 @@ namespace L9HLL.Launcher
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Information);
 
-                if (result == MessageBoxResult.Yes)
+if (result == MessageBoxResult.Yes)
                     {
                         var progressDialog = new Dialogs.UpdateProgressDialog();
                         progressDialog.Show();
