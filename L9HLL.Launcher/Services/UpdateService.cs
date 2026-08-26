@@ -119,14 +119,11 @@ namespace L9HLL.Launcher.Services
 
                     var exeDir = AppDomain.CurrentDomain.BaseDirectory;
                     var oldExePath = Path.Combine(exeDir, "L9HLL.Launcher.exe");
-                    var batchPath = Path.Combine(exeDir, "update.bat");
-
                     var batLines = new[]
                     {
                         "@echo off",
                         "setlocal",
-                        "set EXE_DIR=" + exeDir,
-                        "set OLD_EXE=%EXE_DIR%\L9HLL.Launcher.exe",
+                        $"set OLD_EXE={exeDir}\\L9HLL.Launcher.exe",
                         $"set NEW_EXE={tempExe}",
                         $"set ZIP_PATH={tempZip}",
                         "",
@@ -143,14 +140,15 @@ namespace L9HLL.Launcher.Services
                         ")",
                         "del \"%NEW_EXE%\"",
                         "del \"%ZIP_PATH%\"",
-                        "del \"%EXE_DIR%\update.bat\"",
+                        "del \"%OLD_EXE:exe=bat%\"",
                         "exit"
                     };
-                    File.WriteAllLines(batchPath, batLines);
+                    var finalBatPath = oldExePath.Replace(".exe", ".bat");
+                    File.WriteAllLines(finalBatPath, batLines);
 
                     var psi = new ProcessStartInfo
                     {
-                        FileName = batchPath,
+                        FileName = finalBatPath,
                         WindowStyle = ProcessWindowStyle.Hidden,
                         UseShellExecute = false,
                         CreateNoWindow = true
