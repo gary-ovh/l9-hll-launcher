@@ -101,6 +101,23 @@ namespace L9HLL.Launcher.Services
             }
         }
 
+        private async void OnServerItemClick(object? sender, EventArgs e)
+        {
+            if (sender is ToolStripMenuItem item && _serverMenuItems.Values.Contains(item))
+            {
+                var serverName = _serverMenuItems.Keys.FirstOrDefault(k => _serverMenuItems[k] == item);
+                if (serverName != null)
+                {
+                    var server = _viewModel.Servers.FirstOrDefault(s => s.Name == serverName);
+                    if (server != null)
+                    {
+                        _contextMenu.Close();
+                        await OnQuickLaunch(server);
+                    }
+                }
+            }
+        }
+
         private void BuildServerMenu()
         {
             if (_isRefreshing) return;
@@ -124,11 +141,14 @@ namespace L9HLL.Launcher.Services
                         {
                             existingItem.Enabled = true;
                             existingItem.ForeColor = Color.Empty;
+                            existingItem.Click -= OnServerItemClick;
+                            existingItem.Click += OnServerItemClick;
                         }
                         else
                         {
                             existingItem.Enabled = false;
                             existingItem.ForeColor = Color.FromArgb(100, 100, 100);
+                            existingItem.Click -= OnServerItemClick;
                         }
                     }
                     else
@@ -136,11 +156,7 @@ namespace L9HLL.Launcher.Services
                         var item = new ToolStripMenuItem(text);
                         if (server.IsOnline)
                         {
-                            item.Click += async (s, ev) =>
-                            {
-                                _contextMenu.Close();
-                                await OnQuickLaunch(server);
-                            };
+                            item.Click += OnServerItemClick;
                         }
                         else
                         {
@@ -183,6 +199,7 @@ namespace L9HLL.Launcher.Services
                 {
                     item.Text = $"[L9] {server.Name} (Querying...)";
                     item.Enabled = false;
+                    item.Click -= OnServerItemClick;
                 }
 
                 var serverInfo = new ServerInfo
@@ -203,6 +220,7 @@ namespace L9HLL.Launcher.Services
                         item.Text = $"[L9] {server.Name} ({status.PlayerCount}/{status.MaxPlayers})";
                         item.Enabled = true;
                         item.ForeColor = Color.Empty;
+                        item.Click += OnServerItemClick;
                     }
                     _launchService.LaunchServer(server);
                 }
