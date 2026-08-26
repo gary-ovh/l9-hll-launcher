@@ -172,7 +172,7 @@ namespace L9HLL.Launcher.Services
             try
             {
                 SetItemText(item, $"[L9] {server.Name} (Querying...)");
-                item.Enabled = false;
+                DisableItem(item);
 
                 var serverInfo = new ServerInfo
                 {
@@ -184,18 +184,22 @@ namespace L9HLL.Launcher.Services
 
                 var (status, _) = await _queryService.QueryAsync(serverInfo);
 
-                if (status.IsOnline)
+                // Marshal back to UI thread for all remaining work
+                _contextMenu.Invoke((Action)(() =>
                 {
-                    SetItemText(item, $"[L9] {server.Name} ({status.PlayerCount}/{status.MaxPlayers})");
-                    item.Enabled = true;
-                    _launchService.LaunchServer(server);
-                }
-                else
-                {
-                    SetItemText(item, $"[L9] {server.Name} (Offline)");
-                    item.Enabled = false;
-                    item.ForeColor = Color.FromArgb(100, 100, 100);
-                }
+                    if (status.IsOnline)
+                    {
+                        SetItemText(item, $"[L9] {server.Name} ({status.PlayerCount}/{status.MaxPlayers})");
+                        EnableItem(item);
+                        _launchService.LaunchServer(server);
+                    }
+                    else
+                    {
+                        SetItemText(item, $"[L9] {server.Name} (Offline)");
+                        DisableItem(item);
+                        item.ForeColor = Color.FromArgb(100, 100, 100);
+                    }
+                }));
             }
             catch (Exception ex)
             {
@@ -203,7 +207,7 @@ namespace L9HLL.Launcher.Services
                 try
                 {
                     SetItemText(item, $"[L9] {server.Name} (Query Failed)");
-                    item.Enabled = false;
+                    DisableItem(item);
                     item.ForeColor = Color.FromArgb(100, 100, 100);
                 }
                 catch { }
@@ -212,6 +216,16 @@ namespace L9HLL.Launcher.Services
             {
                 _isRefreshing = false;
             }
+        }
+
+        private void EnableItem(ToolStripMenuItem item)
+        {
+            _contextMenu.Invoke((Action)(() => { item.Enabled = true; item.ForeColor = Color.Empty; }));
+        }
+
+        private void DisableItem(ToolStripMenuItem item)
+        {
+            _contextMenu.Invoke((Action)(() => { item.Enabled = false; }));
         }
 
         private void SetItemText(ToolStripMenuItem item, string text)
