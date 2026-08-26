@@ -158,7 +158,16 @@ namespace L9HLL.Launcher
                     MessageBoxImage.Information);
 
                 if (result == MessageBoxResult.Yes)
-                    UpdateService.DownloadAndUpdate(downloadUrl);
+                    {
+                        var progressDialog = new Dialogs.UpdateProgressDialog();
+                        progressDialog.ShowDialog();
+                        _ = Task.Run(async () =>
+                        {
+                            await UpdateService.DownloadAndUpdate(downloadUrl, progressDialog);
+                            if (!progressDialog.Cancelled)
+                                progressDialog.CloseWithoutCancel();
+                        });
+                    }
             });
         }
 

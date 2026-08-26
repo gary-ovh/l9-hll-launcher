@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+using L9HLL.Launcher.Dialogs;
 using L9HLL.Launcher.Services;
 
 namespace L9HLL.Launcher.Services
@@ -87,83 +88,140 @@ namespace L9HLL.Launcher.Services
             }
         }
 
-        public static void DownloadAndUpdate(string zipUrl)
+        public static async Task DownloadAndUpdate(string zipUrl, UpdateProgressDialog progressDialog)
         {
-            Task.Run(async () =>
+            try
             {
-                try
+                progressDialog.SetStatus("Downloading update...");
+                progressDialog.SetProgress(5);
+
+                var http = new HttpClient();
+                http.Timeout = TimeSpan.FromSeconds(60);
+                http.DefaultRequestHeaders.Add("User-Agent", "L9HLL-Launcher");
+
+                var tempZip = Path.Combine(Path.GetTempPath(), "L9HLL_Launcher_Update.zip");
+                var tempExe = Path.Combine(Path.GetTempPath(), "L9HLL.Launcher_new.exe");
+
+                // Download with progress
+                var response = await http.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead);
+                var totalBytes = response.Content.Headers.ContentLength ?? 0;
+                var buffer = new byte[8192];
+                var downloaded = 0;
+
+                using (var downloadStream = await response.Content.ReadAsStreamAsync())
+                using (var fileStream = new FileStream(tempZip, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
                 {
-                    var http = new HttpClient();
-                    http.Timeout = TimeSpan.FromSeconds(60);
-                    http.DefaultRequestHeaders.Add("User-Agent", "L9HLL-Launcher");
+                    while (true)
+                    {
+                        var read = await downloadStream.ReadAsync(buffer, 0, buffer.Length);
+                        if (read == 0) break;
 
-                    var tempZip = Path.Combine(Path.GetTempPath(), "L9HLL_Launcher_Update.zip");
-                    var tempExe = Path.Combine(Path.GetTempPath(), "L9HLL.Launcher_new.exe");
+                        fileStream.Write(buffer, 0, read);
+                        downloaded += read;
 
-                    var data = await http.GetByteArrayAsync(zipUrl);
-                    File.WriteAllBytes(tempZip, data);
+                        if (progressDialog.Cancelled)
+                        {
+                            File.Delete(tempZip);
+                            return;
+                        }
 
-                    using var archive = ZipFile.OpenRead(tempZip);
+                        if (totalBytes > 0)
+                        {
+                            var percent = (int)((downloaded * 100) / totalBytes);
+                            progressDialog.SetProgress(Math.Min(percent, 50));
+                        }
+                    }
+                }
+
+                if (progressDialog.Cancelled)
+                {
+                    File.Delete(tempZip);
+                    return;
+                }
+
+                progressDialog.SetStatus("Extracting update...");
+                progressDialog.SetProgress(55);
+
+                using (var archive = ZipFile.OpenRead(tempZip))
+                {
                     var exeEntry = archive.Entries.FirstOrDefault(e =>
                         e.FullName.EndsWith("L9HLL.Launcher.exe"));
 
                     if (exeEntry == null)
                     {
                         File.Delete(tempZip);
-                        ConfigService.LogError(new Exception("Update exe not found in zip"));
+                        progressDialog.SetStatus("Error: update file not found in archive");
+                        progressDialog.Cancelled = true;
                         return;
                     }
 
-                    using var exeStream = new FileStream(tempExe, FileMode.Create);
-                    exeEntry.Open().CopyTo(exeStream);
-
-                    var exeDir = AppDomain.CurrentDomain.BaseDirectory;
-                    var oldExePath = Path.Combine(exeDir, "L9HLL.Launcher.exe");
-                    var batLines = new[]
+                    using (var exeStream = new FileStream(tempExe, FileMode.Create))
                     {
-                        "@echo off",
-                        "setlocal",
-                        $"set OLD_EXE={exeDir}\\L9HLL.Launcher.exe",
-                        $"set NEW_EXE={tempExe}",
-                        $"set ZIP_PATH={tempZip}",
-                        "",
-                        ":wait_for_exit",
-                        "tasklist /FI \"IMAGENAME eq L9HLL.Launcher.exe\" 2>nul | find /i /n \"L9HLL.Launcher.exe\">nul",
-                        "if not errorlevel 1 goto wait_for_exit",
-                        "",
-                        "timeout /t 2 /nobreak >nul",
-                        "taskkill /F /IM L9HLL.Launcher.exe >nul 2>&1",
-                        "",
-                        "copy /Y \"%NEW_EXE%\" \"%OLD_EXE%\"",
-                        "if not errorlevel 1 (",
-                        "    start \"\" \"%OLD_EXE%\"",
-                        ")",
-                        "del \"%NEW_EXE%\"",
-                        "del \"%ZIP_PATH%\"",
-                        "del \"%OLD_EXE:exe=bat%\"",
-                        "exit"
-                    };
-                    var finalBatPath = oldExePath.Replace(".exe", ".bat");
-                    File.WriteAllLines(finalBatPath, batLines);
-
-                    // UseShellExecute=false cannot run .bat files; must use cmd.exe /c
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = "cmd.exe",
-                        Arguments = $"/c \"{finalBatPath}\"",
-                        WindowStyle = ProcessWindowStyle.Hidden,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    };
-                    Process.Start(psi);
-                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                        System.Windows.Application.Current.Shutdown());
+                        exeEntry.Open().CopyTo(exeStream);
+                    }
                 }
-                catch (Exception ex)
+
+                if (progressDialog.Cancelled)
                 {
-                    ConfigService.LogError(ex);
+                    File.Delete(tempZip);
+                    File.Delete(tempExe);
+                    return;
                 }
-            });
+
+                progressDialog.SetStatus("Preparing restart...");
+                progressDialog.SetProgress(75);
+
+                var exeDir = AppDomain.CurrentDomain.BaseDirectory;
+                var oldExePath = Path.Combine(exeDir, "L9HLL.Launcher.exe");
+                var batLines = new[]
+                {
+                    "@echo off",
+                    "setlocal",
+                    $"set OLD_EXE={exeDir}\\L9HLL.Launcher.exe",
+                    $"set NEW_EXE={tempExe}",
+                    $"set ZIP_PATH={tempZip}",
+                    "",
+                    ":wait_for_exit",
+                    "tasklist /FI \"IMAGENAME eq L9HLL.Launcher.exe\" 2>nul | find /i /n \"L9HLL.Launcher.exe\">nul",
+                    "if not errorlevel 1 goto wait_for_exit",
+                    "",
+                    "timeout /t 2 /nobreak >nul",
+                    "taskkill /F /IM L9HLL.Launcher.exe >nul 2>&1",
+                    "",
+                    "copy /Y \"%NEW_EXE%\" \"%OLD_EXE%\"",
+                    "if not errorlevel 1 (",
+                    "    start \"\" \"%OLD_EXE%\"",
+                    ")",
+                    "del \"%NEW_EXE%\"",
+                    "del \"%ZIP_PATH%\"",
+                    "del \"%OLD_EXE:exe=bat%\"",
+                    "exit"
+                };
+                var finalBatPath = oldExePath.Replace(".exe", ".bat");
+                File.WriteAllLines(finalBatPath, batLines);
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c \"{finalBatPath}\"",
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                Process.Start(psi);
+
+                progressDialog.SetStatus("Relaunching...");
+                progressDialog.SetProgress(100);
+                await Task.Delay(500);
+
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    System.Windows.Application.Current.Shutdown());
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+                progressDialog?.SetStatus($"Error: {ex.Message}");
+            }
         }
 
         public void Dispose()

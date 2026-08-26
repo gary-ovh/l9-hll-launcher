@@ -1,0 +1,35 @@
+<Window x:Class="L9HLL.Launcher.Dialogs.UpdateProgressDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Updating L9 Launcher"
+        Height="200" Width="380"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="#1a1a1a"
+        Foreground="#e0e0e0"
+        FontFamily="Segoe UI"
+        Topmost="True">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" x:Name="StatusText" Text="Preparing update..." FontSize="13" Foreground="#ccc"/>
+
+        <ProgressBar Grid.Row="2" x:Name="Progress" Height="16" Minimum="0" Maximum="100"
+                     Foreground="#8a9a5b" Background="#333" BorderBrush="#444"/>
+
+        <TextBlock Grid.Row="3" x:Name="PercentText" Text="0%" FontSize="10" Foreground="#888"
+                   HorizontalAlignment="Right"/>
+
+        <Button Grid.Row="5" x:Name="CancelBtn" Content="Cancel" Width="100" Height="30"
+                HorizontalAlignment="Right"
+                Background="#8a2222" Foreground="White" BorderBrush="#8a2222"
+                FontSize="12" Cursor="Hand" Click="CancelBtn_Click"/>
+    </Grid>
+</Window>
