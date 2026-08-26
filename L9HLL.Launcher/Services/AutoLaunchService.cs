@@ -22,6 +22,8 @@ namespace L9HLL.Launcher.Services
         private ServerInfo? _launchedServer;
         private bool _seededDialogShown;
 
+        private ServerSeededDialog? _seededDialogRef;
+
         public bool Enabled
         {
             get => _configService.LoadSettings().AutoLaunchEnabled;
@@ -247,6 +249,7 @@ namespace L9HLL.Launcher.Services
             try
             {
                 var (status, _) = await _queryService.QueryAsync(_launchedServer);
+                UpdateStatus($"Monitor tick: {status.PlayerCount}/{status.MaxPlayers} players on {status.Name}");
                 if (status.PlayerCount >= 90)
                 {
                     _monitorTimer.Stop();
@@ -254,8 +257,11 @@ namespace L9HLL.Launcher.Services
                     UpdateStatus($"Server seeded! {status.PlayerCount}/{status.MaxPlayers} players");
 
                     var dialog = new ServerSeededDialog();
+                    _seededDialogRef = dialog;
+                    UpdateStatus($"Seeded dialog shown. Player count: {status.PlayerCount}");
                     dialog.Closed += (s, e) =>
                     {
+                        _seededDialogRef = null;
                         if (!dialog.WasCancelled)
                         {
                             UpdateStatus("Seeding timer expired. Closing game.");
