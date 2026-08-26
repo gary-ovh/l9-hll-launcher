@@ -132,7 +132,9 @@ namespace L9HLL.Launcher.Dialogs
                 UpdateStatusText.Text = "Checking...";
                 UpdateStatusText.Foreground = new System.Windows.Media.SolidColorBrush(
                     (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#8a9a5b"));
-                await _updateService.ForceCheckAsync();
+
+                var status = await _updateService.ForceCheckAsync();
+                SetUpdateTimeStatus(status);
             }
             catch (Exception ex)
             {
@@ -154,9 +156,20 @@ namespace L9HLL.Launcher.Dialogs
                 }
                 else if (status.Contains("available", StringComparison.OrdinalIgnoreCase))
                 {
-                    UpdateStatusText.Text = $"v{status.Split(' ')[0]} available!";
+                    UpdateStatusText.Text = $"{status}";
                     UpdateStatusText.Foreground = new System.Windows.Media.SolidColorBrush(
                         (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#d4a017"));
+                }
+                else if (status.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
+                         status.Contains("already", StringComparison.OrdinalIgnoreCase))
+                {
+                    UpdateStatusText.Text = status;
+                    UpdateStatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                }
+                else
+                {
+                    UpdateStatusText.Text = "Check failed";
+                    UpdateStatusText.Foreground = System.Windows.Media.Brushes.Red;
                 }
             }
             catch (Exception ex)

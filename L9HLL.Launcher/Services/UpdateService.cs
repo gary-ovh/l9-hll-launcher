@@ -40,31 +40,40 @@ namespace L9HLL.Launcher.Services
             _ = Task.Run(CheckForUpdate);
         }
 
-        public async Task ForceCheckAsync()
+        public async Task<string> ForceCheckAsync()
         {
-            if (_isChecking) return;
-            await CheckForUpdate();
+            if (_isChecking) return "Already checking...";
+            return await RunCheck();
         }
 
         private async Task CheckForUpdate()
         {
             if (!CheckUpdates) return;
-            if (_isChecking) return;
+            await RunCheck();
+        }
+
+        private async Task<string> RunCheck()
+        {
+            if (_isChecking) return "Already checking...";
             _isChecking = true;
 
             try
             {
-                _http.DefaultRequestHeaders.Add("User-Agent", "L9HLL-Launcher");
+                if (!_http.DefaultRequestHeaders.Contains("User-Agent"))
+                    _http.DefaultRequestHeaders.Add("User-Agent", "L9HLL-Launcher");
+
                 var response = await _http.GetStringAsync(
                     "https://api.github.com/repos/gary-ovh/l9-hll-launcher/releases/latest");
                 var release = JsonSerializer.Deserialize<GitHubRelease>(response);
 
-                if (release == null || release.Assets == null || release.Assets.Count == 0) return;
+                if (release == null || release.Assets == null || release.Assets.Count == 0)
+                    return "Check failed";
 
                 var latest = release.TagName.TrimStart('v');
                 var current = ConfigService.CurrentVersion;
 
-                if (string.IsNullOrWhiteSpace(latest) || string.IsNullOrWhiteSpace(current)) return;
+                if (string.IsNullOrWhiteSpace(latest) || string.IsNullOrWhiteSpace(current))
+                    return "Check failed";
 
                 var currentParsed = System.Version.TryParse(current, out var cv) ? cv : null;
                 var latestParsed = System.Version.TryParse(latest, out var lv) ? lv : null;
@@ -75,12 +84,17 @@ namespace L9HLL.Launcher.Services
                     if (asset != null && !string.IsNullOrEmpty(asset.BrowserDownloadUrl))
                     {
                         UpdateAvailable?.Invoke(latest, asset.BrowserDownloadUrl);
+                        return $"v{latest} available";
                     }
+                    return "Check failed";
                 }
+
+                return "up to date";
             }
             catch (Exception ex)
             {
                 ConfigService.LogError(ex);
+                return "Check failed";
             }
             finally
             {
