@@ -48,6 +48,7 @@ namespace L9HLL.Launcher.Services
             _contextMenu.Items.Add("-");
             _contextMenu.Items.Add("Settings", null, (s, e) =>
             {
+                _contextMenu.Close();
                 Restore();
                 _ = Task.Run(async () =>
                 {
@@ -135,7 +136,11 @@ namespace L9HLL.Launcher.Services
                         var item = new ToolStripMenuItem(text);
                         if (server.IsOnline)
                         {
-                            item.Click += async (s, ev) => await OnQuickLaunch(server, (ToolStripMenuItem)s!);
+                            item.Click += async (s, ev) =>
+                            {
+                                _contextMenu.Close();
+                                await OnQuickLaunch(server);
+                            };
                         }
                         else
                         {
@@ -164,15 +169,21 @@ namespace L9HLL.Launcher.Services
             }
         }
 
-        private async Task OnQuickLaunch(ServerStatus server, ToolStripMenuItem item)
+        private async Task OnQuickLaunch(ServerStatus server)
         {
             if (_isRefreshing) return;
             _isRefreshing = true;
 
+            var item = _serverMenuItems.TryGetValue(server.Name, out var existing) ? existing : null;
+
             try
             {
-                SetItemText(item, $"[L9] {server.Name} (Querying...)");
-                DisableItem(item);
+                // Menu already closed, safe to access directly
+                if (item != null)
+                {
+                    item.Text = $"[L9] {server.Name} (Querying...)";
+                    item.Enabled = false;
+                }
 
                 var serverInfo = new ServerInfo
                 {
@@ -182,59 +193,42 @@ namespace L9HLL.Launcher.Services
                     Game = server.Game
                 };
 
-                // Run query on background thread, get result synchronously
                 var result = await Task.Run(() => _queryService.QueryAsync(serverInfo));
                 var status = result.Item1;
 
                 if (status.IsOnline)
                 {
-                    SetItemText(item, $"[L9] {server.Name} ({status.PlayerCount}/{status.MaxPlayers})");
-                    EnableItem(item);
+                    if (item != null)
+                    {
+                        item.Text = $"[L9] {server.Name} ({status.PlayerCount}/{status.MaxPlayers})";
+                        item.Enabled = true;
+                        item.ForeColor = Color.Empty;
+                    }
                     _launchService.LaunchServer(server);
                 }
                 else
                 {
-                    SetItemText(item, $"[L9] {server.Name} (Offline)");
-                    DisableItem(item);
-                    item.ForeColor = Color.FromArgb(100, 100, 100);
+                    if (item != null)
+                    {
+                        item.Text = $"[L9] {server.Name} (Offline)";
+                        item.Enabled = false;
+                        item.ForeColor = Color.FromArgb(100, 100, 100);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 ConfigService.LogError(ex);
-                try
+                if (item != null)
                 {
-                    SetItemText(item, $"[L9] {server.Name} (Query Failed)");
-                    DisableItem(item);
+                    item.Text = $"[L9] {server.Name} (Query Failed)";
+                    item.Enabled = false;
                     item.ForeColor = Color.FromArgb(100, 100, 100);
                 }
-                catch { }
             }
             finally
             {
                 _isRefreshing = false;
-            }
-        }
-
-        private void EnableItem(ToolStripMenuItem item)
-        {
-            _contextMenu.Invoke((Action)(() => { item.Enabled = true; item.ForeColor = Color.Empty; }));
-        }
-
-        private void DisableItem(ToolStripMenuItem item)
-        {
-            _contextMenu.Invoke((Action)(() => { item.Enabled = false; }));
-        }
-
-        private void SetItemText(ToolStripMenuItem item, string text)
-        {
-            try
-            {
-                _contextMenu.Invoke(new Action(() => item.Text = text));
-            }
-            catch (Exception ex)
-            {
-                ConfigService.LogError(ex);
             }
         }
 

@@ -93,31 +93,34 @@ namespace L9HLL.Launcher.Services
             try
             {
                 progressDialog.SetStatus("Downloading update...");
-                progressDialog.SetProgress(5);
+                progressDialog.SetProgress(1);
 
                 var http = new HttpClient();
-                http.Timeout = TimeSpan.FromSeconds(60);
+                http.Timeout = TimeSpan.FromSeconds(120);
                 http.DefaultRequestHeaders.Add("User-Agent", "L9HLL-Launcher");
 
                 var tempZip = Path.Combine(Path.GetTempPath(), "L9HLL_Launcher_Update.zip");
                 var tempExe = Path.Combine(Path.GetTempPath(), "L9HLL.Launcher_new.exe");
 
-                // Download with progress
                 var response = await http.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead);
-                var totalBytes = response.Content.Headers.ContentLength ?? 0;
-                var buffer = new byte[8192];
-                var downloaded = 0;
+                var stream = await response.Content.ReadAsStreamAsync();
 
-                using (var downloadStream = await response.Content.ReadAsStreamAsync())
+                using (stream)
                 using (var fileStream = new FileStream(tempZip, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
                 {
+                    var buffer = new byte[65536];
+                    var downloaded = 0L;
+                    var totalMs = 0L;
+
                     while (true)
                     {
-                        var read = await downloadStream.ReadAsync(buffer, 0, buffer.Length);
+                        var startMs = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+                        var read = await stream.ReadAsync(buffer, 0, buffer.Length);
                         if (read == 0) break;
 
                         fileStream.Write(buffer, 0, read);
                         downloaded += read;
+                        totalMs += DateTimeOffset.Now.ToUnixTimeMilliseconds() - startMs;
 
                         if (progressDialog.Cancelled)
                         {
@@ -125,10 +128,14 @@ namespace L9HLL.Launcher.Services
                             return;
                         }
 
-                        if (totalBytes > 0)
+                        // Estimate progress from download speed
+                        if (totalMs > 1000)
                         {
-                            var percent = (int)((downloaded * 100) / totalBytes);
-                            progressDialog.SetProgress(Math.Min(percent, 50));
+                            var speed = downloaded / (totalMs / 1000.0); // bytes per second
+                            // Assume remaining based on initial speed (cap at 80% until complete)
+                            var estimatedTotal = speed * 60 > downloaded ? speed * 60 : downloaded * 2;
+                            var pct = (int)(Math.Min(downloaded, estimatedTotal) * 80.0 / Math.Max(estimatedTotal, 1));
+                            progressDialog.SetProgress(Math.Max(pct, 2));
                         }
                     }
                 }

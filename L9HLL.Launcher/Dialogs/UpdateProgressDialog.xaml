@@ -22,7 +22,8 @@
         <TextBlock Grid.Row="0" x:Name="StatusText" Text="Preparing update..." FontSize="13" Foreground="#ccc"/>
 
         <ProgressBar Grid.Row="2" x:Name="Progress" Height="16" Minimum="0" Maximum="100"
-                     Foreground="#8a9a5b" Background="#333" BorderBrush="#444"/>
+                     Foreground="#8a9a5b" Background="#333" BorderBrush="#444"
+                     IsIndeterminate="True"/>
 
         <TextBlock Grid.Row="3" x:Name="PercentText" Text="0%" FontSize="10" Foreground="#888"
                    HorizontalAlignment="Right"/>

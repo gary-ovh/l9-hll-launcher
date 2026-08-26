@@ -15,16 +15,16 @@ namespace L9HLL.Launcher.Dialogs
 
         public void SetStatus(string text)
         {
-            Dispatcher.Invoke(() => StatusText.Text = text);
+            Dispatcher.BeginInvoke(new Action(() => StatusText.Text = text));
         }
 
         public void SetProgress(int percent)
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.BeginInvoke(new Action(() =>
             {
                 Progress.Value = percent;
                 PercentText.Text = $"{percent}%";
-            });
+            }));
         }
 
         private void CancelBtn_Click(object sender, RoutedEventArgs e)
