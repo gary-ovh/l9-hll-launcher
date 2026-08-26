@@ -160,12 +160,12 @@ namespace L9HLL.Launcher
                 if (result == MessageBoxResult.Yes)
                     {
                         var progressDialog = new Dialogs.UpdateProgressDialog();
-                        progressDialog.ShowDialog();
+                        progressDialog.Show();
                         _ = Task.Run(async () =>
                         {
                             await UpdateService.DownloadAndUpdate(downloadUrl, progressDialog);
                             if (!progressDialog.Cancelled)
-                                progressDialog.CloseWithoutCancel();
+                                progressDialog.Dispatcher.Invoke(() => progressDialog.Close());
                         });
                     }
             });
