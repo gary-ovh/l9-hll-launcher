@@ -149,8 +149,11 @@ namespace L9HLL.Launcher
             _dispatcher.Invoke(() =>
             {
                 var result = MessageBox.Show(
-                    $"Version {version} is available!\n\nUpdate now?",
-                    "Update Available",
+                    $"A new version of the L9 Launcher is available!\n\n" +
+                    $"Current: {ConfigService.CurrentVersion}\n" +
+                    $"Latest:  {version}\n\n" +
+                    $"Update now to get the latest features and fixes?",
+                    "L9 Launcher Update Available",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Information);
 
