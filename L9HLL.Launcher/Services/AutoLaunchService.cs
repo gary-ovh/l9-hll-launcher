@@ -256,24 +256,36 @@ namespace L9HLL.Launcher.Services
                     _seededDialogShown = true;
                     UpdateStatus($"Server seeded! {status.PlayerCount}/{status.MaxPlayers} players");
 
-                    var dialog = new ServerSeededDialog();
-                    _seededDialogRef = dialog;
-                    UpdateStatus($"Seeded dialog shown. Player count: {status.PlayerCount}");
-                    dialog.Closed += (s, e) =>
+                    _dispatcher.Invoke(() =>
                     {
-                        _seededDialogRef = null;
-                        if (!dialog.WasCancelled)
+                        var mw = Application.Current.MainWindow;
+                        if (mw != null && !mw.IsVisible)
                         {
-                            UpdateStatus("Seeding timer expired. Closing game.");
-                            _launchService.CloseGame();
+                            mw.Show();
+                            mw.WindowState = WindowState.Normal;
+                            mw.Activate();
                         }
-                        else
+
+                        var dialog = new ServerSeededDialog();
+                        _seededDialogRef = dialog;
+                        UpdateStatus($"Seeded dialog shown. Player count: {status.PlayerCount}");
+                        dialog.Closed += (s, e) =>
                         {
-                            UpdateStatus("Player chose to keep playing.");
-                        }
-                    };
-                    dialog.Show();
-                    dialog.Activate();
+                            _seededDialogRef = null;
+                            if (!dialog.WasCancelled)
+                            {
+                                UpdateStatus("Seeding timer expired. Closing game.");
+                                _launchService.CloseGame();
+                            }
+                            else
+                            {
+                                UpdateStatus("Player chose to keep playing.");
+                            }
+                        };
+                        dialog.Show();
+                        dialog.Activate();
+                        dialog.Focus();
+                    });
                 }
             }
             catch (Exception ex)
