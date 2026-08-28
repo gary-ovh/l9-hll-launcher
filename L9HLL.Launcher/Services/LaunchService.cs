@@ -139,36 +139,54 @@ namespace L9HLL.Launcher.Services
         {
             try
             {
-                for (int i = 0; i < 15; i++)
-                    await Task.Delay(1000);
+                await Task.Delay(30000);
 
-                for (int i = 0; i < 90; i++)
+                for (int i = 0; i < 150; i++)
                 {
                     var gameWindow = FindGameWindow(isVietnam);
                     if (gameWindow != IntPtr.Zero && IsWindow(gameWindow))
                     {
+                        ConfigService.Log($"AutoPressConnect: game window found, sending keys");
                         SetForegroundWindow(gameWindow);
-                        await Task.Delay(1000);
+                        await Task.Delay(3000);
 
-                        for (int j = 0; j < 5; j++)
+                        for (int retry = 0; retry < 3; retry++)
                         {
-                            SendKeyboardInput(VK_SPACE);
-                            await Task.Delay(800);
-                        }
-                        for (int j = 0; j < 5; j++)
-                        {
-                            SendKeyboardInput(VK_RETURN);
-                            await Task.Delay(800);
-                        }
-                        for (int j = 0; j < 5; j++)
-                        {
-                            SendKeyboardInput(VK_ESCAPE);
-                            await Task.Delay(800);
+                            ConfigService.Log($"AutoPressConnect: key send attempt {retry + 1}/3");
+                            for (int j = 0; j < 5; j++)
+                            {
+                                SendKeyboardInput(VK_SPACE);
+                                await Task.Delay(800);
+                            }
+                            for (int j = 0; j < 5; j++)
+                            {
+                                SendKeyboardInput(VK_RETURN);
+                                await Task.Delay(800);
+                            }
+                            for (int j = 0; j < 5; j++)
+                            {
+                                SendKeyboardInput(VK_ESCAPE);
+                                await Task.Delay(800);
+                            }
+                            await Task.Delay(5000);
+
+                            var stillSameWindow = FindGameWindow(isVietnam);
+                            if (stillSameWindow != IntPtr.Zero && IsWindow(stillSameWindow))
+                            {
+                                SetForegroundWindow(stillSameWindow);
+                                await Task.Delay(2000);
+                            }
+                            else
+                            {
+                                break;
+                            }
                         }
                         return;
                     }
                     await Task.Delay(1000);
                 }
+
+                ConfigService.Log("AutoPressConnect: timed out, game window never found");
             }
             catch (Exception ex)
             {

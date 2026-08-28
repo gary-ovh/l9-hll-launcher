@@ -101,6 +101,17 @@ namespace L9HLL.Launcher.Services
             }
             catch { }
         }
+
+        public static void Log(string message)
+        {
+            try
+            {
+                var exeDir = AppDomain.CurrentDomain.BaseDirectory;
+                var logPath = Path.Combine(exeDir, "debug.log");
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} | {message}\n");
+            }
+            catch { }
+        }
     }
 
     public class AppSettings
