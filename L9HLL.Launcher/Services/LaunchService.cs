@@ -146,41 +146,26 @@ namespace L9HLL.Launcher.Services
                     var gameWindow = FindGameWindow(isVietnam);
                     if (gameWindow != IntPtr.Zero && IsWindow(gameWindow))
                     {
-                        ConfigService.Log($"AutoPressConnect: game window found, sending keys");
+                        ConfigService.Log("AutoPressConnect: game window found, sending keys");
                         SetForegroundWindow(gameWindow);
                         await Task.Delay(3000);
 
-                        for (int retry = 0; retry < 3; retry++)
+                        for (int j = 0; j < 5; j++)
                         {
-                            ConfigService.Log($"AutoPressConnect: key send attempt {retry + 1}/3");
-                            for (int j = 0; j < 5; j++)
-                            {
-                                SendKeyboardInput(VK_SPACE);
-                                await Task.Delay(800);
-                            }
-                            for (int j = 0; j < 5; j++)
-                            {
-                                SendKeyboardInput(VK_RETURN);
-                                await Task.Delay(800);
-                            }
-                            for (int j = 0; j < 5; j++)
-                            {
-                                SendKeyboardInput(VK_ESCAPE);
-                                await Task.Delay(800);
-                            }
-                            await Task.Delay(5000);
-
-                            var stillSameWindow = FindGameWindow(isVietnam);
-                            if (stillSameWindow != IntPtr.Zero && IsWindow(stillSameWindow))
-                            {
-                                SetForegroundWindow(stillSameWindow);
-                                await Task.Delay(2000);
-                            }
-                            else
-                            {
-                                break;
-                            }
+                            SendKeyboardInput(VK_SPACE);
+                            await Task.Delay(800);
                         }
+                        for (int j = 0; j < 5; j++)
+                        {
+                            SendKeyboardInput(VK_RETURN);
+                            await Task.Delay(800);
+                        }
+                        for (int j = 0; j < 5; j++)
+                        {
+                            SendKeyboardInput(VK_ESCAPE);
+                            await Task.Delay(800);
+                        }
+                        ConfigService.Log("AutoPressConnect: keys sent, done");
                         return;
                     }
                     await Task.Delay(1000);
