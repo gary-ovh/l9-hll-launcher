@@ -139,16 +139,16 @@ namespace L9HLL.Launcher.Services
         {
             try
             {
-                for (int i = 0; i < 15; i++)
-                    await Task.Delay(1000);
+                await Task.Delay(30000);
 
-                for (int i = 0; i < 90; i++)
+                for (int i = 0; i < 150; i++)
                 {
                     var gameWindow = FindGameWindow(isVietnam);
                     if (gameWindow != IntPtr.Zero && IsWindow(gameWindow))
                     {
+                        ConfigService.Log("AutoPressConnect: game window found, sending keys");
                         SetForegroundWindow(gameWindow);
-                        await Task.Delay(1000);
+                        await Task.Delay(3000);
 
                         for (int j = 0; j < 5; j++)
                         {
@@ -165,10 +165,13 @@ namespace L9HLL.Launcher.Services
                             SendKeyboardInput(VK_ESCAPE);
                             await Task.Delay(800);
                         }
+                        ConfigService.Log("AutoPressConnect: keys sent, done");
                         return;
                     }
                     await Task.Delay(1000);
                 }
+
+                ConfigService.Log("AutoPressConnect: timed out, game window never found");
             }
             catch (Exception ex)
             {
