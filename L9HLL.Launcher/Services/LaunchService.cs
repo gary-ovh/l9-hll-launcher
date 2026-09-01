@@ -93,6 +93,23 @@ namespace L9HLL.Launcher.Services
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetWindowDC(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+
+        private const uint WM_CLOSE = 0x0010;
+        private const uint WM_KEYDOWN = 0x0100;
+        private const uint WM_KEYUP = 0x0101;
+
         public async void LaunchServer(ServerStatus server)
         {
             var steamPath = FindSteamPath();
@@ -146,25 +163,13 @@ namespace L9HLL.Launcher.Services
                     var gameWindow = FindGameWindow(isVietnam);
                     if (gameWindow != IntPtr.Zero && IsWindow(gameWindow))
                     {
-                        ConfigService.Log("AutoPressConnect: game window found, sending keys");
+                        ConfigService.Log("AutoPressConnect: game window found, sending keys via PostMessage");
                         SetForegroundWindow(gameWindow);
                         await Task.Delay(3000);
 
-                        for (int j = 0; j < 5; j++)
-                        {
-                            SendKeyboardInput(VK_SPACE);
-                            await Task.Delay(800);
-                        }
-                        for (int j = 0; j < 5; j++)
-                        {
-                            SendKeyboardInput(VK_RETURN);
-                            await Task.Delay(800);
-                        }
-                        for (int j = 0; j < 5; j++)
-                        {
-                            SendKeyboardInput(VK_ESCAPE);
-                            await Task.Delay(800);
-                        }
+                        await PostKeyboardInput(gameWindow, VK_SPACE, 5, 800);
+                        await PostKeyboardInput(gameWindow, VK_RETURN, 5, 800);
+                        await PostKeyboardInput(gameWindow, VK_ESCAPE, 5, 800);
                         ConfigService.Log("AutoPressConnect: keys sent, done");
                         return;
                     }
@@ -176,6 +181,16 @@ namespace L9HLL.Launcher.Services
             catch (Exception ex)
             {
                 ConfigService.LogError(ex);
+            }
+        }
+
+        private async Task PostKeyboardInput(IntPtr hWnd, int vkCode, int count, int delayMs)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                PostMessage(hWnd, WM_KEYDOWN, (IntPtr)vkCode, IntPtr.Zero);
+                PostMessage(hWnd, WM_KEYUP, (IntPtr)vkCode, IntPtr.Zero);
+                await Task.Delay(delayMs);
             }
         }
 
@@ -292,11 +307,24 @@ namespace L9HLL.Launcher.Services
                         var processes = Process.GetProcessesByName(name);
                         foreach (var proc in processes)
                         {
-                            if (!proc.HasExited)
+                            if (proc.HasExited) continue;
+
+                            ConfigService.Log($"CloseGame: sending WM_CLOSE to {name} (PID {proc.Id})");
+                            var hwnd = proc.MainWindowHandle;
+                            if (hwnd != IntPtr.Zero)
                             {
-                                proc.Kill();
-                                proc.WaitForExit(3000);
+                                SendMessage(hwnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+
+                                if (proc.WaitForExit(10000))
+                                {
+                                    ConfigService.Log($"CloseGame: {name} exited gracefully");
+                                    continue;
+                                }
                             }
+
+                            ConfigService.Log($"CloseGame: {name} did not exit, forcing kill");
+                            proc.Kill();
+                            proc.WaitForExit(3000);
                         }
                     }
                     catch (Exception ex)
