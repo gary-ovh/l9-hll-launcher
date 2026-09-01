@@ -10,8 +10,8 @@
     <RootNamespace>L9HLL.Launcher</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
-<Version>1.3.11</Version>
-    <AssemblyVersion>1.3.11</AssemblyVersion>
+<Version>1.3.12</Version>
+    <AssemblyVersion>1.3.12</AssemblyVersion>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <SelfContained>true</SelfContained>
