@@ -99,7 +99,8 @@ namespace L9HLL.Launcher
 
         private void CloseBtn_Click(object sender, RoutedEventArgs e)
         {
-            _trayService?.Exit();
+            if (!HasOpenDialogs)
+                Hide();
         }
 
         private void SettingsBtn_Click(object sender, RoutedEventArgs e)
