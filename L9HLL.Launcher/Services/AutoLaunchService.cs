@@ -190,7 +190,7 @@ namespace L9HLL.Launcher.Services
                         };
                         _seededDialogShown = false;
                         StartSeedingMonitor();
-                        _launchService.LaunchServer(server);
+                        _launchService.LaunchServer(server, autoTeam: true);
                     }
                     else
                     {

@@ -114,6 +114,14 @@ namespace L9HLL.Launcher.Services
         }
     }
 
+    public class TeamCalibrationData
+    {
+        public float AxisX { get; set; }
+        public float AxisY { get; set; }
+        public float AlliesX { get; set; }
+        public float AlliesY { get; set; }
+    }
+
     public class AppSettings
     {
         public bool StartupOnBoot { get; set; }
@@ -121,5 +129,8 @@ namespace L9HLL.Launcher.Services
         public bool CheckUpdates { get; set; } = true;
         public bool AutoLaunchEnabled { get; set; }
         public string AutoLaunchTime { get; set; } = "22:00";
+        public bool AutoTeamEnabled { get; set; }
+        public string AutoTeamPreference { get; set; } = "random";
+        public Dictionary<string, TeamCalibrationData> TeamCalibrations { get; set; } = new();
     }
 }

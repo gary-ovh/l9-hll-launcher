@@ -186,6 +186,7 @@ namespace L9HLL.Launcher
                     _configService,
                     _updateService!,
                     _autoLaunchService!,
+                    _launchService,
                     () =>
                     {
                         OnPropertyChanged(nameof(StartupOnBoot));

@@ -109,8 +109,28 @@ namespace L9HLL.Launcher.Services
         private const uint WM_CLOSE = 0x0010;
         private const uint WM_KEYDOWN = 0x0100;
         private const uint WM_KEYUP = 0x0101;
+        private const uint WM_LBUTTONDOWN = 0x0201;
+        private const uint WM_LBUTTONUP = 0x0202;
+        private const uint WM_MOUSEMOVE = 0x0200;
 
-        public async void LaunchServer(ServerStatus server)
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+        public async void LaunchServer(ServerStatus server, bool autoTeam = false)
         {
             var steamPath = FindSteamPath();
             bool isVietnam = server.Game == "vietnam";
@@ -149,10 +169,65 @@ namespace L9HLL.Launcher.Services
                 ConfigService.LogError(ex);
             }
 
-            await AutoPressConnect(isVietnam);
+            var gameWindow = await AutoPressConnect(isVietnam);
+
+            if (autoTeam && gameWindow != IntPtr.Zero)
+            {
+                _ = Task.Run(() => TryAutoJoinTeam(gameWindow));
+            }
         }
 
-        private async Task AutoPressConnect(bool isVietnam)
+        private async Task TryAutoJoinTeam(IntPtr gameWindow)
+        {
+            try
+            {
+                int width = 0, height = 0;
+                RECT rect;
+                for (int i = 0; i < 30; i++)
+                {
+                    if (GetClientRect(gameWindow, out rect))
+                    {
+                        width = rect.Right - rect.Left;
+                        height = rect.Bottom - rect.Top;
+                        if (width > 0 && height > 0) break;
+                    }
+                    await Task.Delay(2000);
+                }
+                if (width <= 0 || height <= 0)
+                {
+                    ConfigService.Log("AutoJoinTeam: could not read game window size");
+                    return;
+                }
+
+                var cfg = new ConfigService().LoadSettings();
+                if (!cfg.AutoTeamEnabled)
+                {
+                    ConfigService.Log("AutoJoinTeam: not enabled");
+                    return;
+                }
+
+                var key = $"{width}x{height}";
+                if (cfg.TeamCalibrations == null || !cfg.TeamCalibrations.TryGetValue(key, out var cal))
+                {
+                    ConfigService.Log($"AutoJoinTeam: no calibration for resolution {key}, skipping");
+                    return;
+                }
+
+                var pref = cfg.AutoTeamPreference ?? "random";
+                bool isAxis = pref == "axis" || (pref == "random" && Random.Shared.Next(2) == 0);
+                float xPct = isAxis ? cal.AxisX : cal.AlliesX;
+                float yPct = isAxis ? cal.AxisY : cal.AlliesY;
+
+                ConfigService.Log($"AutoJoinTeam: joining {(isAxis ? "Axis" : "Allies")} team (calibration {key})");
+                await AutoJoinTeam(gameWindow, xPct, yPct);
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
+        }
+
+        private async Task<IntPtr> AutoPressConnect(bool isVietnam)
         {
             try
             {
@@ -171,7 +246,7 @@ namespace L9HLL.Launcher.Services
                         await PostKeyboardInput(gameWindow, VK_RETURN, 5, 800);
                         await PostKeyboardInput(gameWindow, VK_ESCAPE, 5, 800);
                         ConfigService.Log("AutoPressConnect: keys sent, done");
-                        return;
+                        return gameWindow;
                     }
                     await Task.Delay(1000);
                 }
@@ -182,6 +257,7 @@ namespace L9HLL.Launcher.Services
             {
                 ConfigService.LogError(ex);
             }
+            return IntPtr.Zero;
         }
 
         private async Task PostKeyboardInput(IntPtr hWnd, int vkCode, int count, int delayMs)
@@ -192,6 +268,62 @@ namespace L9HLL.Launcher.Services
                 PostMessage(hWnd, WM_KEYUP, (IntPtr)vkCode, IntPtr.Zero);
                 await Task.Delay(delayMs);
             }
+        }
+
+        public async Task AutoJoinTeam(IntPtr gameWindow, float xPct, float yPct)
+        {
+            try
+            {
+                ConfigService.Log("AutoJoinTeam: waiting for team selection screen...");
+                await Task.Delay(20000);
+
+                for (int i = 0; i < 120; i++)
+                {
+                    if (!IsWindow(gameWindow))
+                    {
+                        ConfigService.Log("AutoJoinTeam: game window gone");
+                        return;
+                    }
+
+                    RECT rect;
+                    if (!GetClientRect(gameWindow, out rect))
+                        continue;
+
+                    int width = rect.Right - rect.Left;
+                    int height = rect.Bottom - rect.Top;
+
+                    if (width <= 0 || height <= 0)
+                    {
+                        await Task.Delay(2000);
+                        continue;
+                    }
+
+                    int clickX = (int)(width * xPct);
+                    int clickY = (int)(height * yPct);
+
+                    ConfigService.Log($"AutoJoinTeam: clicking at {clickX},{clickY} (client area {width}x{height})");
+                    SetForegroundWindow(gameWindow);
+                    await Task.Delay(500);
+                    PostMessage(gameWindow, WM_MOUSEMOVE, IntPtr.Zero, MakeLParam(clickX, clickY));
+                    await Task.Delay(200);
+                    PostMessage(gameWindow, WM_LBUTTONDOWN, IntPtr.Zero, MakeLParam(clickX, clickY));
+                    await Task.Delay(200);
+                    PostMessage(gameWindow, WM_LBUTTONUP, IntPtr.Zero, MakeLParam(clickX, clickY));
+                    ConfigService.Log("AutoJoinTeam: click sent");
+                    return;
+                }
+
+                ConfigService.Log("AutoJoinTeam: timed out");
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
+        }
+
+        private IntPtr MakeLParam(int x, int y)
+        {
+            return (IntPtr)((y << 16) | (x & 0xFFFF));
         }
 
         private void SendKeyboardInput(int vkCode)
@@ -211,6 +343,16 @@ namespace L9HLL.Launcher.Services
         }
 
         private IntPtr FindGameWindow(bool isVietnam)
+        {
+            return FindGameWindowInternal(isVietnam);
+        }
+
+        public IntPtr FindGameWindowPublic(bool isVietnam)
+        {
+            return FindGameWindowInternal(isVietnam);
+        }
+
+        private static IntPtr FindGameWindowInternal(bool isVietnam)
         {
             try
             {
