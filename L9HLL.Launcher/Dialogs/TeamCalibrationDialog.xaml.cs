@@ -1,9 +1,17 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Threading;
+using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 using L9HLL.Launcher.Services;
+using GdiBitmap = System.Drawing.Bitmap;
+using GdiGraphics = System.Drawing.Graphics;
+using GdiImageFormat = System.Drawing.Imaging.ImageFormat;
+using GdiPixelFormat = System.Drawing.Imaging.PixelFormat;
 
 namespace L9HLL.Launcher.Dialogs
 {
@@ -18,22 +26,20 @@ namespace L9HLL.Launcher.Dialogs
         public bool WasCalibrated { get; private set; }
 
         private readonly IntPtr _gameWindow;
-        private readonly Dispatcher _dispatcher;
-        private readonly DispatcherTimer _pollTimer;
         private int _step;
-        private bool _wasMouseDown;
+        private int _imgW;
+        private int _imgH;
+        private double _clickScaleX = 1.0;
+        private double _clickScaleY = 1.0;
 
         public TeamCalibrationDialog(IntPtr gameWindow)
         {
             InitializeComponent();
             _gameWindow = gameWindow;
-            _dispatcher = Application.Current.Dispatcher;
             Topmost = true;
             ShowInTaskbar = false;
             SetStep(0);
-
-            _pollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
-            _pollTimer.Tick += OnPollTick;
+            Loaded += async (s, e) => await CaptureAsync();
         }
 
         private void ReadyBtn_Click(object sender, RoutedEventArgs e)
@@ -42,7 +48,6 @@ namespace L9HLL.Launcher.Dialogs
             {
                 _step = 1;
                 SetStep(1);
-                _pollTimer.Start();
             }
             else if (_step == 3)
             {
@@ -50,11 +55,16 @@ namespace L9HLL.Launcher.Dialogs
             }
             else
             {
-                _pollTimer.Stop();
                 _step = 0;
                 SetStep(0);
+                AxisDot.Visibility = Visibility.Collapsed;
+                AxisMarker.Visibility = Visibility.Collapsed;
+                AlliesDot.Visibility = Visibility.Collapsed;
+                AlliesMarker.Visibility = Visibility.Collapsed;
             }
         }
+
+        private void RefreshBtn_Click(object sender, RoutedEventArgs e) => _ = CaptureAsync();
 
         private void SetStep(int step)
         {
@@ -62,125 +72,191 @@ namespace L9HLL.Launcher.Dialogs
             switch (step)
             {
                 case 0:
-                    StepText.Text = "Make sure you're connected to a server and the team selection screen is visible in the game. Then click below to start capturing.";
+                    StepText.Text = "Click a team button on the screenshot below.";
                     StepText.Foreground = Brushes.White;
-                    ReadyBtn.Content = "I'm Ready";
+                    ReadyBtn.Content = "Start";
+                    RefreshBtn.Visibility = Visibility.Collapsed;
+                    ScreenshotImage.Cursor = Cursors.Arrow;
                     break;
                 case 1:
-                    StepText.Text = "Step 1/2 - Now click the AXIS team button in the game window.";
+                    StepText.Text = "Step 1/2 - Click the AXIS team button on the screenshot.";
                     StepText.Foreground = (Brush)new BrushConverter().ConvertFromString("#ffd27f");
                     ReadyBtn.Content = "Cancel";
+                    RefreshBtn.Visibility = Visibility.Visible;
+                    ScreenshotImage.Cursor = Cursors.Cross;
                     break;
                 case 2:
-                    StepText.Text = "Step 2/2 - Now click the ALLIES team button in the game window.";
+                    StepText.Text = "Step 2/2 - Click the ALLIES team button on the screenshot.";
                     StepText.Foreground = (Brush)new BrushConverter().ConvertFromString("#7fb8ff");
                     ReadyBtn.Content = "Cancel";
+                    RefreshBtn.Visibility = Visibility.Visible;
+                    ScreenshotImage.Cursor = Cursors.Cross;
                     break;
                 case 3:
                     StepText.Text = "Calibration complete!";
                     StepText.Foreground = (Brush)new BrushConverter().ConvertFromString("#8a9a5b");
                     ReadyBtn.Content = "Close";
+                    RefreshBtn.Visibility = Visibility.Visible;
+                    ScreenshotImage.Cursor = Cursors.Arrow;
                     break;
             }
         }
 
-        private void OnPollTick(object? sender, EventArgs e)
+        private void ScreenshotImage_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (_step != 1 && _step != 2) return;
 
-            bool isDown = (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
+            var pos = e.GetPosition(ScreenshotImage);
+            double imgX = pos.X / _clickScaleX;
+            double imgY = pos.Y / _clickScaleY;
+            if (imgX < 0 || imgY < 0 || imgX >= _imgW || imgY >= _imgH) return;
 
-            if (isDown && !_wasMouseDown)
+            float xPct = (float)(imgX / _imgW);
+            float yPct = (float)(imgY / _imgH);
+            CapturedWidth = _imgW;
+            CapturedHeight = _imgH;
+            ConfigService.Log($"Calibration: click at image ({imgX:F0},{imgY:F0}) of {_imgW}x{_imgH} -> ({xPct:P2},{yPct:P2})");
+
+            if (_step == 1)
             {
-                // Mouse just pressed down - capture position
-                POINT pt;
-                GetCursorPos(out pt);
+                AxisX = xPct;
+                AxisY = yPct;
+                PlaceDot(AxisDot, AxisMarker, pos.X, pos.Y);
+                SetStep(2);
+            }
+            else
+            {
+                AlliesX = xPct;
+                AlliesY = yPct;
+                PlaceDot(AlliesDot, AlliesMarker, pos.X, pos.Y);
+                WasCalibrated = true;
+                SetStep(3);
+            }
+        }
 
-                var client = new POINT { x = pt.x, y = pt.y };
-                if (ScreenToClientNative(_gameWindow, ref client))
+        private void PlaceDot(Ellipse dot, Line line, double x, double y)
+        {
+            dot.Visibility = Visibility.Visible;
+            Canvas.SetLeft(dot, x - 6);
+            Canvas.SetTop(dot, y - 6);
+            line.Visibility = Visibility.Visible;
+            line.X1 = x; line.Y1 = 0;
+            line.X2 = x; line.Y2 = ScreenshotImage.Height;
+        }
+
+        private async System.Threading.Tasks.Task CaptureAsync()
+        {
+            try
+            {
+                using var bmp = CaptureWindow(_gameWindow);
+                if (bmp == null || bmp.Width == 0) return;
+
+                _imgW = bmp.Width;
+                _imgH = bmp.Height;
+                ConfigService.Log($"Calibration: captured game window {_imgW}x{_imgH}");
+
+                using var ms = new System.IO.MemoryStream();
+                bmp.Save(ms, GdiImageFormat.Png);
+                ms.Position = 0;
+
+                var image = new BitmapImage();
+                image.BeginInit();
+                image.CacheOption = BitmapCacheOption.OnLoad;
+                image.StreamSource = ms;
+                image.EndInit();
+
+                ScreenshotImage.Source = image;
+                ScreenshotImage.Width = _imgW;
+                ScreenshotImage.Height = _imgH;
+
+                double scale = 1.0;
+                double maxW = SystemParameters.PrimaryScreenWidth * 0.8;
+                double maxH = SystemParameters.PrimaryScreenHeight * 0.65;
+                if (_imgW > maxW || _imgH > maxH)
                 {
-                    RECT r;
-                    if (GetClientRect(_gameWindow, out r))
-                    {
-                        int w = r.Right - r.Left;
-                        int h = r.Bottom - r.Top;
-                        ConfigService.Log($"Calibration: click detected screen=({pt.x},{pt.y}) client=({client.x},{client.y}) area={w}x{h}");
-
-                        if (w > 0 && h > 0 && client.x >= 0 && client.x < w && client.y >= 0 && client.y < h)
-                        {
-                            float xPct = (float)client.x / w;
-                            float yPct = (float)client.y / h;
-                            CapturedWidth = w;
-                            CapturedHeight = h;
-                            ConfigService.Log($"Calibration: VALID click at ({xPct:P1},{yPct:P1})");
-
-                            if (_step == 1)
-                            {
-                                AxisX = xPct;
-                                AxisY = yPct;
-                                SetStep(2);
-                            }
-                            else
-                            {
-                                AlliesX = xPct;
-                                AlliesY = yPct;
-                                WasCalibrated = true;
-                                SetStep(3);
-                                _pollTimer.Stop();
-                            }
-                        }
-                        else
-                        {
-                            ConfigService.Log($"Calibration: click outside game window area");
-                        }
-                    }
+                    scale = Math.Min(maxW / _imgW, maxH / _imgH);
+                    ScreenshotImage.Width = _imgW * scale;
+                    ScreenshotImage.Height = _imgH * scale;
+                    ScreenshotImage.Stretch = Stretch.Fill;
                 }
                 else
                 {
-                    ConfigService.Log($"Calibration: ScreenToClient failed for window {_gameWindow}");
+                    ScreenshotImage.Stretch = Stretch.None;
                 }
-            }
 
-            _wasMouseDown = isDown;
+                ScreenshotBorder.Width = ScreenshotImage.Width + 2;
+                ScreenshotBorder.Height = ScreenshotImage.Height + 2;
+                Width = ScreenshotImage.Width + 64;
+                Height = ScreenshotImage.Height + 150;
+
+                // Store scale for click mapping
+                _clickScaleX = scale;
+                _clickScaleY = scale;
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+                StepText.Text = "Failed to capture game window. Is the game visible (not minimized)?";
+            }
         }
 
         protected override void OnClosed(EventArgs e)
         {
-            _pollTimer.Stop();
             base.OnClosed(e);
         }
 
-        [StructLayout(LayoutKind.Sequential)]
-        private struct POINT
+        private static GdiBitmap? CaptureWindow(IntPtr hWnd)
         {
-            public int x;
-            public int y;
+            if (!GetClientRect(hWnd, out RECT cr)) return null;
+            int w = cr.Right - cr.Left;
+            int h = cr.Bottom - cr.Top;
+            if (w <= 0 || h <= 0) return null;
+
+            using var bmp = new GdiBitmap(w, h, GdiPixelFormat.Format32bppArgb);
+            using var g = GdiGraphics.FromImage(bmp);
+            IntPtr hdc = g.GetHdc();
+            IntPtr mem = CreateDC("DISPLAY", null, null, IntPtr.Zero);
+            IntPtr old = SelectObject(mem, CreateCompatibleBitmap(mem, w, h));
+
+            bool ok = PrintWindow(hWnd, mem, 0x00000002); // PW_RENDERFULLCONTENT
+            if (!ok)
+                ok = BitBlt(mem, 0, 0, w, h, hdc, 0, 0, 0xcc0020);
+
+            SelectObject(mem, old);
+            g.ReleaseHdc();
+            DeleteDC(mem);
+
+            return ok ? bmp : null;
         }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT
         {
-            public int Left;
-            public int Top;
-            public int Right;
-            public int Bottom;
+            public int Left, Top, Right, Bottom;
         }
-
-        [DllImport("user32.dll")]
-        private static extern short GetAsyncKeyState(int vKey);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool GetCursorPos(out POINT lpPoint);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool ScreenToClientNative(IntPtr hWnd, ref POINT lpPoint);
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
 
-        private const int VK_LEFT = 0x01;
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr CreateDC(string lpszDriver, string? lpszDevice, string? lpszOutput, IntPtr lpInit);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int w, int h);
+
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr SelectObject(IntPtr hdc, IntPtr h);
+
+        [DllImport("gdi32.dll")]
+        private static extern bool DeleteDC(IntPtr hdc);
+
+        [DllImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool BitBlt(IntPtr hdc, int x, int y, int w, int h, IntPtr hdcSrc, int xSrc, int ySrc, uint rop);
     }
 }
