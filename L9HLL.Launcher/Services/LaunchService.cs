@@ -61,7 +61,10 @@ namespace L9HLL.Launcher.Services
         }
 
         private const int INPUT_KEYBOARD = 1;
+        private const int INPUT_MOUSE = 0;
         private const int KEYEVENTF_KEYUP = 0x0002;
+        private const int MOUSEEVENTF_LEFTDOWN = 0x0002;
+        private const int MOUSEEVENTF_LEFTUP = 0x0004;
         private const int VK_SPACE = 0x20;
         private const int VK_RETURN = 0x0D;
         private const int VK_ESCAPE = 0x1B;
@@ -129,6 +132,25 @@ namespace L9HLL.Launcher.Services
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int x;
+            public int y;
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetCursorPos(int X, int Y);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetCursorPos(ref POINT lpPoint);
 
         public async void LaunchServer(ServerStatus server, bool autoTeam = false)
         {
@@ -277,9 +299,9 @@ namespace L9HLL.Launcher.Services
             try
             {
                 ConfigService.Log("AutoJoinTeam: waiting for team selection screen...");
-                await Task.Delay(20000);
+                await Task.Delay(15000);
 
-                for (int i = 0; i < 120; i++)
+                for (int i = 0; i < 20; i++)
                 {
                     var gameWindow = FindGameWindow(isVietnam);
                     if (gameWindow == IntPtr.Zero || !IsWindow(gameWindow))
@@ -304,26 +326,17 @@ namespace L9HLL.Launcher.Services
                     int clickX = (int)(width * xPct);
                     int clickY = (int)(height * yPct);
 
-                    gameWindow = FindGameWindow(isVietnam);
-                    if (gameWindow == IntPtr.Zero || !IsWindow(gameWindow))
-                    {
-                        ConfigService.Log("AutoJoinTeam: game window gone before click");
-                        return;
-                    }
-
-                    ConfigService.Log($"AutoJoinTeam: clicking at {clickX},{clickY} (client area {width}x{height})");
+                    ConfigService.Log($"AutoJoinTeam: click attempt {i + 1}/20 at {clickX},{clickY} (client area {width}x{height}, hwnd={gameWindow})");
                     SetForegroundWindow(gameWindow);
                     await Task.Delay(500);
-                    PostMessage(gameWindow, WM_MOUSEMOVE, IntPtr.Zero, MakeLParam(clickX, clickY));
-                    await Task.Delay(200);
-                    PostMessage(gameWindow, WM_LBUTTONDOWN, IntPtr.Zero, MakeLParam(clickX, clickY));
-                    await Task.Delay(200);
-                    PostMessage(gameWindow, WM_LBUTTONUP, IntPtr.Zero, MakeLParam(clickX, clickY));
+                    SendMouseClickClient(gameWindow, clickX, clickY);
                     ConfigService.Log("AutoJoinTeam: click sent");
-                    return;
+
+                    if (i < 19)
+                        await Task.Delay(5000);
                 }
 
-                ConfigService.Log("AutoJoinTeam: timed out");
+                ConfigService.Log("AutoJoinTeam: finished all click attempts");
             }
             catch (Exception ex)
             {
@@ -350,6 +363,34 @@ namespace L9HLL.Launcher.Services
 
             SendInput(1, ref inputDown, Marshal.SizeOf(typeof(INPUT)));
             SendInput(1, ref inputUp, Marshal.SizeOf(typeof(INPUT)));
+        }
+
+        private void SendMouseClickClient(IntPtr hWnd, int clientX, int clientY)
+        {
+            var pt = new POINT { x = clientX, y = clientY };
+            if (!ClientToScreen(hWnd, ref pt))
+            {
+                ConfigService.Log("AutoJoinTeam: ClientToScreen failed");
+                return;
+            }
+
+            var oldPos = new POINT();
+            GetCursorPos(ref oldPos);
+
+            SetCursorPos(pt.x, pt.y);
+            System.Threading.Thread.Sleep(150);
+
+            INPUT down = new INPUT { Type = INPUT_MOUSE };
+            down.U.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+            SendInput(1, ref down, Marshal.SizeOf(typeof(INPUT)));
+
+            System.Threading.Thread.Sleep(60);
+
+            INPUT up = new INPUT { Type = INPUT_MOUSE };
+            up.U.mi.dwFlags = MOUSEEVENTF_LEFTUP;
+            SendInput(1, ref up, Marshal.SizeOf(typeof(INPUT)));
+
+            SetCursorPos(oldPos.x, oldPos.y);
         }
 
         private IntPtr FindGameWindow(bool isVietnam)
