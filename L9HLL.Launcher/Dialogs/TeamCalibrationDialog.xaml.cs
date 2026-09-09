@@ -19,13 +19,9 @@ namespace L9HLL.Launcher.Dialogs
 
         private readonly IntPtr _gameWindow;
         private readonly Dispatcher _dispatcher;
-        private IntPtr _hookId = IntPtr.Zero;
-        private LowLevelMouseProc? _hookProc;
+        private readonly DispatcherTimer _pollTimer;
         private int _step;
-
-        private const int WH_MOUSE_LL = 14;
-        private const int WM_LBUTTONDOWN = 0x0201;
-        private static readonly Random Rng = new();
+        private bool _wasMouseDown;
 
         public TeamCalibrationDialog(IntPtr gameWindow)
         {
@@ -35,6 +31,9 @@ namespace L9HLL.Launcher.Dialogs
             Topmost = true;
             ShowInTaskbar = false;
             SetStep(0);
+
+            _pollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+            _pollTimer.Tick += OnPollTick;
         }
 
         private void ReadyBtn_Click(object sender, RoutedEventArgs e)
@@ -43,7 +42,7 @@ namespace L9HLL.Launcher.Dialogs
             {
                 _step = 1;
                 SetStep(1);
-                InstallHook();
+                _pollTimer.Start();
             }
             else if (_step == 3)
             {
@@ -51,7 +50,7 @@ namespace L9HLL.Launcher.Dialogs
             }
             else
             {
-                UninstallHook();
+                _pollTimer.Stop();
                 _step = 0;
                 SetStep(0);
             }
@@ -78,7 +77,6 @@ namespace L9HLL.Launcher.Dialogs
                     ReadyBtn.Content = "Cancel";
                     break;
                 case 3:
-                    UninstallHook();
                     StepText.Text = "Calibration complete!";
                     StepText.Foreground = (Brush)new BrushConverter().ConvertFromString("#8a9a5b");
                     ReadyBtn.Content = "Close";
@@ -86,94 +84,71 @@ namespace L9HLL.Launcher.Dialogs
             }
         }
 
-        private void InstallHook()
-        {
-            if (_hookId != IntPtr.Zero) return;
-            _hookProc = HookCallback;
-            _hookId = SetWindowsHookEx(WH_MOUSE_LL, _hookProc, GetModuleHandle(null), 0);
-            if (_hookId == IntPtr.Zero)
-            {
-                ConfigService.Log("Calibration: failed to install mouse hook");
-                _hookProc = null;
-                _step = 0;
-                SetStep(0);
-            }
-        }
-
-        private void UninstallHook()
-        {
-            if (_hookId != IntPtr.Zero)
-            {
-                UnhookWindowsHookEx(_hookId);
-                _hookId = IntPtr.Zero;
-            }
-            _hookProc = null;
-        }
-
-        private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
-        {
-            if (nCode >= 0 && wParam == (IntPtr)WM_LBUTTONDOWN && (_step == 1 || _step == 2))
-            {
-                try
-                {
-                    var info = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-                    _dispatcher.BeginInvoke((Action)(() => OnGameClick(info.pt)));
-                }
-                catch (Exception ex)
-                {
-                    ConfigService.LogError(ex);
-                }
-            }
-            return CallNextHookEx(_hookId, nCode, wParam, lParam);
-        }
-
-        private void OnGameClick(POINT pt)
+        private void OnPollTick(object? sender, EventArgs e)
         {
             if (_step != 1 && _step != 2) return;
 
-            var client = new POINT { x = pt.x, y = pt.y };
-            if (!ScreenToClientNative(_gameWindow, ref client)) return;
+            bool isDown = (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
 
-            RECT r;
-            if (!GetClientRect(_gameWindow, out r)) return;
-            int w = r.Right - r.Left;
-            int h = r.Bottom - r.Top;
-            if (w <= 0 || h <= 0) return;
-
-            if (client.x < 0 || client.x >= w || client.y < 0 || client.y >= h)
+            if (isDown && !_wasMouseDown)
             {
-                StepText.Text = "That click was outside the game window. Try again.";
-                return;
+                // Mouse just pressed down - capture position
+                POINT pt;
+                GetCursorPos(out pt);
+
+                var client = new POINT { x = pt.x, y = pt.y };
+                if (ScreenToClientNative(_gameWindow, ref client))
+                {
+                    RECT r;
+                    if (GetClientRect(_gameWindow, out r))
+                    {
+                        int w = r.Right - r.Left;
+                        int h = r.Bottom - r.Top;
+                        ConfigService.Log($"Calibration: click detected screen=({pt.x},{pt.y}) client=({client.x},{client.y}) area={w}x{h}");
+
+                        if (w > 0 && h > 0 && client.x >= 0 && client.x < w && client.y >= 0 && client.y < h)
+                        {
+                            float xPct = (float)client.x / w;
+                            float yPct = (float)client.y / h;
+                            CapturedWidth = w;
+                            CapturedHeight = h;
+                            ConfigService.Log($"Calibration: VALID click at ({xPct:P1},{yPct:P1})");
+
+                            if (_step == 1)
+                            {
+                                AxisX = xPct;
+                                AxisY = yPct;
+                                SetStep(2);
+                            }
+                            else
+                            {
+                                AlliesX = xPct;
+                                AlliesY = yPct;
+                                WasCalibrated = true;
+                                SetStep(3);
+                                _pollTimer.Stop();
+                            }
+                        }
+                        else
+                        {
+                            ConfigService.Log($"Calibration: click outside game window area");
+                        }
+                    }
+                }
+                else
+                {
+                    ConfigService.Log($"Calibration: ScreenToClient failed for window {_gameWindow}");
+                }
             }
 
-            float xPct = (float)client.x / w;
-            float yPct = (float)client.y / h;
-            CapturedWidth = w;
-            CapturedHeight = h;
-            ConfigService.Log($"Calibration: captured click at {client.x},{client.y} ({xPct:P1},{yPct:P1}) of {w}x{h}");
-
-            if (_step == 1)
-            {
-                AxisX = xPct;
-                AxisY = yPct;
-                SetStep(2);
-            }
-            else
-            {
-                AlliesX = xPct;
-                AlliesY = yPct;
-                WasCalibrated = true;
-                SetStep(3);
-            }
+            _wasMouseDown = isDown;
         }
 
         protected override void OnClosed(EventArgs e)
         {
-            UninstallHook();
+            _pollTimer.Stop();
             base.OnClosed(e);
         }
-
-        private delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
 
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT
@@ -191,28 +166,12 @@ namespace L9HLL.Launcher.Dialogs
             public int Bottom;
         }
 
-        [StructLayout(LayoutKind.Sequential)]
-        private struct MSLLHOOKSTRUCT
-        {
-            public POINT pt;
-            public uint mouseData;
-            public uint flags;
-            public uint time;
-            public IntPtr dwExtraInfo;
-        }
-
         [DllImport("user32.dll")]
-        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
+        private static extern short GetAsyncKeyState(int vKey);
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
-        private static extern IntPtr GetModuleHandle(string? lpModuleName);
+        private static extern bool GetCursorPos(out POINT lpPoint);
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -221,5 +180,7 @@ namespace L9HLL.Launcher.Dialogs
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+        private const int VK_LEFT = 0x01;
     }
 }
