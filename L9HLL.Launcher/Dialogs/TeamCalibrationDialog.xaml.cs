@@ -16,7 +16,7 @@ namespace L9HLL.Launcher.Dialogs
         public int CapturedHeight { get; set; }
         public bool WasCalibrated { get; private set; }
 
-        private readonly IntPtr _gameWindow;
+        private readonly Func<IntPtr> _windowProvider;
         private IntPtr _hookId = IntPtr.Zero;
         private LowLevelMouseProc? _hookProc;
         private int _step;
@@ -24,10 +24,10 @@ namespace L9HLL.Launcher.Dialogs
         private const int WH_MOUSE_LL = 14;
         private const int WM_LBUTTONDOWN = 0x0201;
 
-        public TeamCalibrationDialog(IntPtr gameWindow)
+        public TeamCalibrationDialog(Func<IntPtr> windowProvider)
         {
             InitializeComponent();
-            _gameWindow = gameWindow;
+            _windowProvider = windowProvider;
             Topmost = true;
             ShowInTaskbar = false;
             SetStep(0);
@@ -106,7 +106,7 @@ namespace L9HLL.Launcher.Dialogs
                 _step = 4;
                 return;
             }
-            ConfigService.Log($"Calibration: mouse hook installed, game window={_gameWindow}");
+            ConfigService.Log($"Calibration: mouse hook installed");
         }
 
         private void UninstallHook()
@@ -139,14 +139,22 @@ namespace L9HLL.Launcher.Dialogs
         // Runs on the UI thread (hook was installed there) - direct UI updates are safe.
         private void HandleGameClick(POINT screenPt)
         {
+            if (_step != 1 && _step != 2 && _step != 3) return;
+
+            var gameWindow = _windowProvider();
+            if (gameWindow == IntPtr.Zero || !IsWindow(gameWindow))
+            {
+                ConfigService.Log($"Calibration: LBUTTONDOWN screen=({screenPt.x},{screenPt.y}) but no valid game window found (step={_step})");
+                return;
+            }
+
             var client = new POINT { x = screenPt.x, y = screenPt.y };
-            bool screenOk = ScreenToClient(_gameWindow, ref client);
-            GetClientRect(_gameWindow, out RECT r);
+            bool screenOk = ScreenToClient(gameWindow, ref client);
+            GetClientRect(gameWindow, out RECT r);
             int w = r.Right - r.Left;
             int h = r.Bottom - r.Top;
             ConfigService.Log($"Calibration: LBUTTONDOWN screen=({screenPt.x},{screenPt.y}) client=({client.x},{client.y}) screenOk={screenOk} clientArea={w}x{h} step={_step}");
 
-            if (_step != 1 && _step != 2 && _step != 3) return;
             if (!screenOk || w <= 0 || h <= 0) return;
 
             if (client.x < 0 || client.x >= w || client.y < 0 || client.y >= h)
@@ -237,5 +245,9 @@ namespace L9HLL.Launcher.Dialogs
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWindow(IntPtr hWnd);
     }
 }

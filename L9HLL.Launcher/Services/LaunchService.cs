@@ -173,19 +173,21 @@ namespace L9HLL.Launcher.Services
 
             if (autoTeam && gameWindow != IntPtr.Zero)
             {
-                _ = Task.Run(() => TryAutoJoinTeam(gameWindow));
+                _ = Task.Run(() => TryAutoJoinTeam(isVietnam));
             }
         }
 
-        private async Task TryAutoJoinTeam(IntPtr gameWindow)
+        private async Task TryAutoJoinTeam(bool isVietnam)
         {
             try
             {
                 int width = 0, height = 0;
+                IntPtr gameWindow = IntPtr.Zero;
                 RECT rect;
                 for (int i = 0; i < 30; i++)
                 {
-                    if (GetClientRect(gameWindow, out rect))
+                    gameWindow = FindGameWindow(isVietnam);
+                    if (gameWindow != IntPtr.Zero && IsWindow(gameWindow) && GetClientRect(gameWindow, out rect))
                     {
                         width = rect.Right - rect.Left;
                         height = rect.Bottom - rect.Top;
@@ -219,7 +221,7 @@ namespace L9HLL.Launcher.Services
                 float yPct = isAxis ? cal.AxisY : cal.AlliesY;
 
                 ConfigService.Log($"AutoJoinTeam: joining {(isAxis ? "Axis" : "Allies")} team (calibration {key})");
-                await AutoJoinTeam(gameWindow, xPct, yPct);
+                await AutoJoinTeam(isVietnam, xPct, yPct);
             }
             catch (Exception ex)
             {
@@ -270,7 +272,7 @@ namespace L9HLL.Launcher.Services
             }
         }
 
-        public async Task AutoJoinTeam(IntPtr gameWindow, float xPct, float yPct)
+        public async Task AutoJoinTeam(bool isVietnam, float xPct, float yPct)
         {
             try
             {
@@ -279,7 +281,8 @@ namespace L9HLL.Launcher.Services
 
                 for (int i = 0; i < 120; i++)
                 {
-                    if (!IsWindow(gameWindow))
+                    var gameWindow = FindGameWindow(isVietnam);
+                    if (gameWindow == IntPtr.Zero || !IsWindow(gameWindow))
                     {
                         ConfigService.Log("AutoJoinTeam: game window gone");
                         return;
@@ -300,6 +303,13 @@ namespace L9HLL.Launcher.Services
 
                     int clickX = (int)(width * xPct);
                     int clickY = (int)(height * yPct);
+
+                    gameWindow = FindGameWindow(isVietnam);
+                    if (gameWindow == IntPtr.Zero || !IsWindow(gameWindow))
+                    {
+                        ConfigService.Log("AutoJoinTeam: game window gone before click");
+                        return;
+                    }
 
                     ConfigService.Log($"AutoJoinTeam: clicking at {clickX},{clickY} (client area {width}x{height})");
                     SetForegroundWindow(gameWindow);

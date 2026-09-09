@@ -232,7 +232,7 @@ namespace L9HLL.Launcher.Dialogs
                     return;
                 }
 
-                var dialog = new TeamCalibrationDialog(gameWindow) { Owner = Application.Current.MainWindow };
+                var dialog = new TeamCalibrationDialog(() => _launchService.FindGameWindowPublic(false)) { Owner = Application.Current.MainWindow };
                 dialog.ShowDialog();
 
                 if (dialog.WasCalibrated)
