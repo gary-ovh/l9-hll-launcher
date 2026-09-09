@@ -46,7 +46,7 @@ namespace L9HLL.Launcher.Dialogs
                 _step = 1;
                 SetStep(1);
             }
-            else if (_step == 3)
+            else if (_step == 4)
             {
                 Close();
             }
@@ -68,16 +68,21 @@ namespace L9HLL.Launcher.Dialogs
                     ReadyBtn.Content = "I'm Ready";
                     break;
                 case 1:
-                    StepText.Text = "Step 1/2 - Now click the AXIS team button in the game window.";
+                    StepText.Text = "Step 1/3 - Now click the AXIS team button in the game window.";
                     StepText.Foreground = (Brush)new BrushConverter().ConvertFromString("#ffd27f");
                     ReadyBtn.Content = "Cancel";
                     break;
                 case 2:
-                    StepText.Text = "Step 2/2 - Now click the ALLIES team button in the game window.";
-                    StepText.Foreground = (Brush)new BrushConverter().ConvertFromString("#7fb8ff");
+                    StepText.Text = "Step 2/3 - Now click SWITCH TEAMS in the game to go back to team selection. (This click is not recorded.)";
+                    StepText.Foreground = Brushes.Gray;
                     ReadyBtn.Content = "Cancel";
                     break;
                 case 3:
+                    StepText.Text = "Step 3/3 - Now click the ALLIES team button in the game window.";
+                    StepText.Foreground = (Brush)new BrushConverter().ConvertFromString("#7fb8ff");
+                    ReadyBtn.Content = "Cancel";
+                    break;
+                case 4:
                     StepText.Text = "Calibration complete!";
                     StepText.Foreground = (Brush)new BrushConverter().ConvertFromString("#8a9a5b");
                     ReadyBtn.Content = "Close";
@@ -98,7 +103,7 @@ namespace L9HLL.Launcher.Dialogs
                 StepText.Text = "Failed to install mouse hook (see debug.log).";
                 StepText.Foreground = Brushes.Red;
                 ReadyBtn.Content = "Close";
-                _step = 3;
+                _step = 4;
                 return;
             }
             ConfigService.Log($"Calibration: mouse hook installed, game window={_gameWindow}");
@@ -141,12 +146,19 @@ namespace L9HLL.Launcher.Dialogs
             int h = r.Bottom - r.Top;
             ConfigService.Log($"Calibration: LBUTTONDOWN screen=({screenPt.x},{screenPt.y}) client=({client.x},{client.y}) screenOk={screenOk} clientArea={w}x{h} step={_step}");
 
-            if (_step != 1 && _step != 2) return;
+            if (_step != 1 && _step != 2 && _step != 3) return;
             if (!screenOk || w <= 0 || h <= 0) return;
 
             if (client.x < 0 || client.x >= w || client.y < 0 || client.y >= h)
             {
-                StepText.Text = "That click was outside the game window. Click the team button in the game.";
+                StepText.Text = "That click was outside the game window. Click the button in the game.";
+                return;
+            }
+
+            if (_step == 2)
+            {
+                ConfigService.Log("Calibration: switch teams click (discarded)");
+                SetStep(3);
                 return;
             }
 
@@ -167,7 +179,7 @@ namespace L9HLL.Launcher.Dialogs
                 AlliesX = xPct;
                 AlliesY = yPct;
                 WasCalibrated = true;
-                SetStep(3);
+                SetStep(4);
             }
         }
 
