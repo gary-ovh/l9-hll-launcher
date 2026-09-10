@@ -2,9 +2,14 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Microsoft.Win32;
 using L9HLL.Launcher.Models;
+using GdiBitmap = System.Drawing.Bitmap;
+using GdiGraphics = System.Drawing.Graphics;
+using GdiImageFormat = System.Drawing.Imaging.ImageFormat;
+using GdiPixelFormat = System.Drawing.Imaging.PixelFormat;
 
 namespace L9HLL.Launcher.Services
 {
@@ -106,9 +111,6 @@ namespace L9HLL.Launcher.Services
         [DllImport("user32.dll")]
         private static extern IntPtr GetWindowDC(IntPtr hWnd);
 
-        [DllImport("user32.dll")]
-        private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
-
         private const uint WM_CLOSE = 0x0010;
         private const uint WM_KEYDOWN = 0x0100;
         private const uint WM_KEYUP = 0x0101;
@@ -151,6 +153,32 @@ namespace L9HLL.Launcher.Services
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetCursorPos(ref POINT lpPoint);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr CreateDC(string lpszDriver, string? lpszDevice, string? lpszOutput, IntPtr lpInit);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int w, int h);
+
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr SelectObject(IntPtr hdc, IntPtr h);
+
+        [DllImport("gdi32.dll")]
+        private static extern bool DeleteDC(IntPtr hdc);
+
+        [DllImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool BitBlt(IntPtr hdc, int x, int y, int w, int h, IntPtr hdcSrc, int xSrc, int ySrc, uint rop);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetDC(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
 
         public async void LaunchServer(ServerStatus server, bool autoTeam = false)
         {
@@ -301,7 +329,14 @@ namespace L9HLL.Launcher.Services
                 ConfigService.Log("AutoJoinTeam: waiting for team selection screen...");
                 await Task.Delay(15000);
 
-                for (int i = 0; i < 20; i++)
+                int lastHash = 0;
+                int teamHash = 0;
+                bool clicked = false;
+                int captureFails = 0;
+                bool blind = false;
+                bool savedDiag = false;
+
+                for (int i = 0; i < 30; i++)
                 {
                     var gameWindow = FindGameWindow(isVietnam);
                     if (gameWindow == IntPtr.Zero || !IsWindow(gameWindow))
@@ -311,32 +346,83 @@ namespace L9HLL.Launcher.Services
                     }
 
                     RECT rect;
-                    if (!GetClientRect(gameWindow, out rect))
-                        continue;
-
+                    if (!GetClientRect(gameWindow, out rect)) continue;
                     int width = rect.Right - rect.Left;
                     int height = rect.Bottom - rect.Top;
-
                     if (width <= 0 || height <= 0)
                     {
-                        await Task.Delay(2000);
+                        await Task.Delay(1000);
                         continue;
                     }
 
-                    int clickX = (int)(width * xPct);
-                    int clickY = (int)(height * yPct);
+                    int hash = GetScreenHash(gameWindow, width, height);
 
-                    ConfigService.Log($"AutoJoinTeam: click attempt {i + 1}/20 at {clickX},{clickY} (client area {width}x{height}, hwnd={gameWindow})");
-                    SetForegroundWindow(gameWindow);
-                    await Task.Delay(500);
-                    SendMouseClickClient(gameWindow, clickX, clickY);
-                    ConfigService.Log("AutoJoinTeam: click sent");
+                    if (hash == 0)
+                    {
+                        captureFails++;
+                        if (captureFails == 1)
+                            ConfigService.Log("AutoJoinTeam: screen capture returned no frame (fullscreen?)");
+                        if (!blind && captureFails >= 3)
+                        {
+                            blind = true;
+                            ConfigService.Log("AutoJoinTeam: screen capture unavailable, falling back to timed clicks (5s apart)");
+                        }
+                    }
+                    else
+                    {
+                        captureFails = 0;
+                        if (!savedDiag)
+                        {
+                            try
+                            {
+                                var shot = CaptureScreen(gameWindow, width, height);
+                                if (shot != null)
+                                {
+                                    using (shot) shot.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "team-diag.png"), GdiImageFormat.Png);
+                                    ConfigService.Log("AutoJoinTeam: saved team-diag.png (first frame)");
+                                }
+                            }
+                            catch (Exception ex) { ConfigService.LogError(ex); }
+                            savedDiag = true;
+                        }
 
-                    if (i < 19)
-                        await Task.Delay(5000);
+                        bool changed = (hash != lastHash);
+
+                        if (!clicked)
+                        {
+                            if (!changed)
+                            {
+                                // Team screen is static; stable across two polls -> click.
+                                clicked = true;
+                                teamHash = hash;
+                                ConfigService.Log($"AutoJoinTeam: screen stable (hash={hash:x8}), clicking team button");
+                                ClickTeam(gameWindow, width, height, xPct, yPct);
+                            }
+                        }
+                        else
+                        {
+                            if (hash != teamHash)
+                            {
+                                ConfigService.Log("AutoJoinTeam: screen changed after click -> team joined, done");
+                                return;
+                            }
+                            if (!changed)
+                            {
+                                ConfigService.Log("AutoJoinTeam: still on team screen, retrying click");
+                                ClickTeam(gameWindow, width, height, xPct, yPct);
+                            }
+                        }
+                    }
+
+                    // Blind fallback: no reliable capture, just click on a timer.
+                    if (blind && i % 2 == 0)
+                        ClickTeam(gameWindow, width, height, xPct, yPct);
+
+                    lastHash = hash;
+                    await Task.Delay(2000);
                 }
 
-                ConfigService.Log("AutoJoinTeam: finished all click attempts");
+                ConfigService.Log("AutoJoinTeam: timed out");
             }
             catch (Exception ex)
             {
@@ -344,9 +430,108 @@ namespace L9HLL.Launcher.Services
             }
         }
 
+        private void ClickTeam(IntPtr gameWindow, int width, int height, float xPct, float yPct)
+        {
+            int clickX = (int)(width * xPct);
+            int clickY = (int)(height * yPct);
+            ConfigService.Log($"AutoJoinTeam: clicking at {clickX},{clickY} (client area {width}x{height})");
+            SetForegroundWindow(gameWindow);
+            System.Threading.Thread.Sleep(500);
+            SendMouseClickClient(gameWindow, clickX, clickY);
+        }
+
         private IntPtr MakeLParam(int x, int y)
         {
             return (IntPtr)((y << 16) | (x & 0xFFFF));
+        }
+
+        private GdiBitmap? CaptureScreen(IntPtr hWnd, int width, int height)
+        {
+            var bmp = new GdiBitmap(width, height, GdiPixelFormat.Format32bppArgb);
+            try
+            {
+                using var g = GdiGraphics.FromImage(bmp);
+                IntPtr hdc = g.GetHdc();
+
+                bool ok = PrintWindow(hWnd, hdc, 0x00000002); // PW_RENDERFULLCONTENT
+
+                if (!ok && GetWindowRect(hWnd, out RECT wr))
+                {
+                    // Fallback: grab the screen region where the window sits
+                    // (works for exclusive fullscreen, which PrintWindow can't see).
+                    IntPtr screenDC = GetDC(IntPtr.Zero);
+                    IntPtr mem = CreateDC("DISPLAY", null, null, IntPtr.Zero);
+                    IntPtr old = SelectObject(mem, CreateCompatibleBitmap(mem, width, height));
+                    BitBlt(mem, 0, 0, width, height, screenDC, wr.Left, wr.Top, 0x00CC0020);
+                    BitBlt(hdc, 0, 0, width, height, mem, 0, 0, 0x00CC0020);
+                    SelectObject(mem, old);
+                    DeleteDC(mem);
+                    ReleaseDC(IntPtr.Zero, screenDC);
+                    ok = true;
+                }
+
+                g.ReleaseHdc();
+                if (!ok)
+                {
+                    bmp.Dispose();
+                    return null;
+                }
+                return bmp;
+            }
+            catch
+            {
+                bmp.Dispose();
+                return null;
+            }
+        }
+
+        private static int GetScreenHash(IntPtr hWnd, int width, int height)
+        {
+            try
+            {
+                using var shot = new GdiBitmap(width, height, GdiPixelFormat.Format32bppArgb);
+                using (var g = GdiGraphics.FromImage(shot))
+                {
+                    IntPtr hdc = g.GetHdc();
+                    bool ok = PrintWindow(hWnd, hdc, 0x00000002);
+                    if (!ok && GetWindowRect(hWnd, out RECT wr))
+                    {
+                        IntPtr screenDC = GetDC(IntPtr.Zero);
+                        IntPtr mem = CreateDC("DISPLAY", null, null, IntPtr.Zero);
+                        IntPtr old = SelectObject(mem, CreateCompatibleBitmap(mem, width, height));
+                        BitBlt(mem, 0, 0, width, height, screenDC, wr.Left, wr.Top, 0x00CC0020);
+                        BitBlt(hdc, 0, 0, width, height, mem, 0, 0, 0x00CC0020);
+                        SelectObject(mem, old);
+                        DeleteDC(mem);
+                        ReleaseDC(IntPtr.Zero, screenDC);
+                        ok = true;
+                    }
+                    g.ReleaseHdc();
+                    if (!ok) return 0;
+                }
+
+                // Downsample to a 32x32 grid and hash the raw pixels (fast, robust to
+                // sub-pixel rendering jitter in the same static screen).
+                var grid = new byte[32 * 32 * 4];
+                for (int gy = 0; gy < 32; gy++)
+                {
+                    int y = (gy * height) / 32;
+                    for (int gx = 0; gx < 32; gx++)
+                    {
+                        int x = (gx * width) / 32;
+                        var px = shot.GetPixel(x, y);
+                        int idx = (gy * 32 + gx) * 4;
+                        grid[idx] = px.R;
+                        grid[idx + 1] = px.G;
+                        grid[idx + 2] = px.B;
+                    }
+                }
+                return BitConverter.ToInt32(SHA256.HashData(grid), 0);
+            }
+            catch
+            {
+                return 0;
+            }
         }
 
         private void SendKeyboardInput(int vkCode)
