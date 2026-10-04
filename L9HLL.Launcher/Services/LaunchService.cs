@@ -237,9 +237,10 @@ namespace L9HLL.Launcher.Services
 
         private void LaunchWardogs(ServerStatus server, string steamPath)
         {
-            // Connect argument candidate #1: "open ip:port" (Unreal UE4/5 default, same as Vietnam).
-            // If this does not auto-connect in-game, change the argument below.
-            string connectArg = $"open {server.Ip}:{server.Port}";
+            // Connect argument candidate #2: "+connect ip:port" (standard UE console
+            // command, same as HLL WW2). "open ip:port" was candidate #1 and did not
+            // auto-connect.
+            string connectArg = $"+connect {server.Ip}:{server.Port}";
 
             try
             {
