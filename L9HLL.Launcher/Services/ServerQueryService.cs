@@ -32,6 +32,21 @@ namespace L9HLL.Launcher.Services
                 return (status, "hardcoded");
             }
 
+            if (server.Game == "wardogs")
+            {
+                // Best-effort: try a standard Source query first (Unreal servers
+                // may or may not answer). Fall back to hardcoded online otherwise.
+                var (wResult, _) = await TryQuery(server.Ip, 27015, status);
+                if (wResult != null)
+                    return (wResult, "OK");
+
+                status.IsOnline = true;
+                status.Map = "unknown";
+                status.PlayerCount = 0;
+                status.MaxPlayers = 100;
+                return (status, "hardcoded");
+            }
+
             var queryPort = server.QueryPort ?? (server.Port + 1);
             var (result, detail) = await TryQuery(server.Ip, queryPort, status);
 

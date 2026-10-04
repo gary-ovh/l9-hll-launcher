@@ -18,6 +18,12 @@
       "port": 7777,
       "queryPort": 7778,
       "game": "vietnam"
+    },
+    {
+      "name": "[L9] Wardogs",
+      "ip": "208.115.223.202",
+      "port": 7777,
+      "game": "wardogs"
     }
   ]
 }

@@ -17,6 +17,7 @@ namespace L9HLL.Launcher.Services
     {
         private const int HLL_AppId = 686810;
         private const int Vietnam_AppId = 3079210;
+        private const int Wardogs_AppId = 1867240;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct INPUT
@@ -184,6 +185,13 @@ namespace L9HLL.Launcher.Services
         {
             var steamPath = FindSteamPath();
             bool isVietnam = server.Game == "vietnam";
+            bool isWardogs = server.Game == "wardogs";
+
+            if (isWardogs)
+            {
+                LaunchWardogs(server, steamPath);
+                return;
+            }
 
             try
             {
@@ -225,6 +233,98 @@ namespace L9HLL.Launcher.Services
             {
                 _ = Task.Run(() => TryAutoJoinTeam(isVietnam));
             }
+        }
+
+        private void LaunchWardogs(ServerStatus server, string steamPath)
+        {
+            // Connect argument candidate #1: "open ip:port" (Unreal UE4/5 default, same as Vietnam).
+            // If this does not auto-connect in-game, change the argument below.
+            string connectArg = $"open {server.Ip}:{server.Port}";
+
+            try
+            {
+                if (!string.IsNullOrEmpty(steamPath))
+                {
+                    ConfigService.Log($"Wardogs: launching via Steam (-applaunch {Wardogs_AppId} \"{connectArg}\")");
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = steamPath,
+                        Arguments = $"-applaunch {Wardogs_AppId} \"{connectArg}\"",
+                        UseShellExecute = true
+                    });
+                }
+                else
+                {
+                    var gamePath = FindWardogsPath();
+                    if (!string.IsNullOrEmpty(gamePath))
+                    {
+                        ConfigService.Log($"Wardogs: launching directly ({gamePath}) \"{connectArg}\"");
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = gamePath,
+                            Arguments = connectArg,
+                            UseShellExecute = true
+                        });
+                    }
+                    else
+                    {
+                        ConfigService.Log("Wardogs: no Steam path and no game install found");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
+        }
+
+        private static string? FindWardogsPath()
+        {
+            var uninstallKeys = new[]
+            {
+                Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+                Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+                Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall")
+            };
+
+            foreach (var root in uninstallKeys)
+            {
+                if (root == null) continue;
+
+                try
+                {
+                    foreach (var subKey in root.GetSubKeyNames())
+                    {
+                        try
+                        {
+                            using var sub = root.OpenSubKey(subKey);
+                            var displayName = sub?.GetValue("DisplayName") as string;
+                            if (displayName == null || !displayName.Contains("Wardogs", System.StringComparison.OrdinalIgnoreCase)) continue;
+
+                            var installPath = sub.GetValue("InstallLocation") as string
+                                             ?? sub.GetValue("InstallPath") as string;
+                            if (string.IsNullOrEmpty(installPath)) continue;
+
+                            var trimmed = installPath.TrimEnd('\\');
+                            var candidates = new[]
+                            {
+                                Path.Combine(trimmed, "WardogsClient-Win64-Shipping.exe"),
+                                Path.Combine(trimmed, "Wardogs", "Binaries", "Win64", "WardogsClient-Win64-Shipping.exe")
+                            };
+                            foreach (var exe in candidates)
+                                if (File.Exists(exe))
+                                    return exe;
+                        }
+                        catch { }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ConfigService.LogError(ex);
+                }
+            }
+
+            return null;
         }
 
         private async Task TryAutoJoinTeam(bool isVietnam)
@@ -675,7 +775,8 @@ namespace L9HLL.Launcher.Services
                 string[] processNames =
                 {
                     "HLL-Win64-Shipping", "HLL",
-                    "HLLVietnam-Win64-Shipping", "HLLVietnam"
+                    "HLLVietnam-Win64-Shipping", "HLLVietnam",
+                    "WardogsClient-Win64-Shipping", "Wardogs"
                 };
 
                 foreach (var name in processNames)

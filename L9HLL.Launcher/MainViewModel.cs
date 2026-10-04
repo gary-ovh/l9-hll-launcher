@@ -93,7 +93,7 @@ namespace L9HLL.Launcher
             set { _selectedGame = value; OnPropertyChanged(); FilterServers(); }
         }
 
-        public string[] GameOptions { get; } = { "All", "WW2", "Vietnam" };
+        public string[] GameOptions { get; } = { "All", "WW2", "Vietnam", "Wardogs" };
 
         private List<ServerInfo> _serverInfos = new();
         private List<ServerStatus> _allServers = new();
@@ -287,9 +287,7 @@ namespace L9HLL.Launcher
                 var game = _selectedGame.ToLower();
                 var internalGame = game == "ww2" ? "hll" : game;
                 var filtered = _allServers.Where(s =>
-                    game == "all" ||
-                    (internalGame == "hll" && s.Game == "hll") ||
-                    (internalGame == "vietnam" && s.Game == "vietnam")
+                    game == "all" || s.Game == internalGame
                 ).ToList();
 
                 foreach (var server in filtered)
