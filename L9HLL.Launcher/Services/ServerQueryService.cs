@@ -58,9 +58,19 @@ namespace L9HLL.Launcher.Services
                         SendTimeout = TimeoutMs
                     }
                 };
+                using var cts = new CancellationTokenSource(TimeoutMs);
 
                 await udp.SendAsync(queryBytes, queryBytes.Length, ip, port);
-                var received = await udp.ReceiveAsync();
+
+                var receiveTask = udp.ReceiveAsync();
+                var winner = await Task.WhenAny(receiveTask, Task.Delay(TimeoutMs, cts.Token));
+                if (winner != receiveTask)
+                {
+                    receiveTask.ContinueWith(_ => { }, TaskContinuationOptions.OnlyOnFaulted);
+                    return (null, "timeout");
+                }
+
+                var received = await receiveTask;
 
                 if (received.Buffer.Length < 6)
                     return (null, "short");
