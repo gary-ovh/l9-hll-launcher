@@ -20,9 +20,12 @@ namespace L9HLL.Launcher.Services
         private readonly MainViewModel _viewModel;
         private readonly LaunchService _launchService;
         private readonly ServerQueryService _queryService;
+        private readonly SettingsGuardService _settingsGuard;
         private readonly DispatcherTimer _refreshTimer;
+        private readonly ToolStripMenuItem _stopRestoreItem;
         private readonly Dictionary<string, ToolStripMenuItem> _serverMenuItems = new();
         private bool _isRefreshing;
+        private bool _stopRestoreRunning;
 
         public TrayService(
             MainWindow mainWindow,
@@ -34,6 +37,7 @@ namespace L9HLL.Launcher.Services
             _viewModel = viewModel;
             _launchService = launchService;
             _queryService = queryService;
+            _settingsGuard = viewModel.SettingsGuard;
 
             _contextMenu = new ContextMenuStrip();
 
@@ -45,7 +49,13 @@ namespace L9HLL.Launcher.Services
             var serversSeparator = new ToolStripSeparator();
             _contextMenu.Items.Add(serversSeparator);
 
+            _stopRestoreItem = new ToolStripMenuItem("Stop game & restore settings")
+            {
+                Visible = false
+            };
+            _stopRestoreItem.Click += OnStopRestoreClick;
             _contextMenu.Items.Add("-");
+            _contextMenu.Items.Add(_stopRestoreItem);
             _contextMenu.Items.Add("Settings", null, (s, e) =>
             {
                 _contextMenu.Close();
@@ -94,10 +104,63 @@ namespace L9HLL.Launcher.Services
             try
             {
                 BuildServerMenu();
+                UpdateStopRestoreItem();
             }
             catch (Exception ex)
             {
                 ConfigService.LogError(ex);
+            }
+        }
+
+        private void UpdateStopRestoreItem()
+        {
+            bool active = _settingsGuard.IsSeededProfileActive;
+            _stopRestoreItem.Visible = active;
+            if (!active) return;
+            var game = _settingsGuard.ActiveGame == "vietnam" ? "Vietnam" : "HLL";
+            if (_stopRestoreRunning)
+            {
+                _stopRestoreItem.Text = "Closing game & restoring...";
+                _stopRestoreItem.Enabled = false;
+            }
+            else
+            {
+                _stopRestoreItem.Text = $"Stop game & restore settings ({game} is running with seed settings)";
+                _stopRestoreItem.Enabled = true;
+            }
+        }
+
+        private async void OnStopRestoreClick(object? sender, EventArgs e)
+        {
+            if (_stopRestoreRunning) return;
+            _stopRestoreRunning = true;
+            _contextMenu.Close();
+            UpdateStopRestoreItem();
+            try
+            {
+                _launchService.CloseGame();
+                for (int i = 0; i < 30 && _settingsGuard.IsSeededProfileActive; i++)
+                {
+                    await Task.Delay(1000);
+                    _settingsGuard.TryRestoreIfIdle();
+                }
+                var error = _settingsGuard.IsSeededProfileActive
+                    ? _settingsGuard.Restore()
+                    : null;
+                if (error != null)
+                    System.Windows.MessageBox.Show(error, "Settings Restore",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                else
+                    ConfigService.Log("Tray: game stopped and settings restored");
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
+            finally
+            {
+                _stopRestoreRunning = false;
+                UpdateStopRestoreItem();
             }
         }
 

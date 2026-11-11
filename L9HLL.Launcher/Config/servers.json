@@ -7,19 +7,6 @@
       "game": "hll"
     },
     {
-      "name": "[L9] The Loyal Nine |#2|",
-      "ip": "40.27.41.9",
-      "port": 7777,
-      "game": "hll"
-    },
-    {
-      "name": "[L9] The Loyal Nine |#1| Vietnam",
-      "ip": "69.162.103.77",
-      "port": 7777,
-      "queryPort": 7778,
-      "game": "vietnam"
-    },
-    {
       "name": "[L9] Wardogs",
       "ip": "208.115.223.202",
       "port": 7777,

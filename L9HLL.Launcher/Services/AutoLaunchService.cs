@@ -15,6 +15,7 @@ namespace L9HLL.Launcher.Services
         private readonly LaunchService _launchService;
         private readonly ServerQueryService _queryService;
         private readonly ConfigService _configService;
+        private readonly SettingsGuardService _settingsGuard;
         private readonly Action<string> _onStatus;
         private readonly Dispatcher _dispatcher;
         private bool _triggeredToday;
@@ -23,6 +24,7 @@ namespace L9HLL.Launcher.Services
         private bool _seededDialogShown;
 
         private ServerSeededDialog? _seededDialogRef;
+        private readonly DispatcherTimer _restoreWatcher;
 
         public bool Enabled
         {
@@ -54,11 +56,13 @@ namespace L9HLL.Launcher.Services
             LaunchService launchService,
             ServerQueryService queryService,
             ConfigService configService,
+            SettingsGuardService settingsGuard,
             Action<string> onStatus)
         {
             _launchService = launchService;
             _queryService = queryService;
             _configService = configService;
+            _settingsGuard = settingsGuard;
             _onStatus = onStatus;
             _dispatcher = Application.Current.Dispatcher;
             _lastDate = DateTime.Today.AddDays(-1);
@@ -66,6 +70,52 @@ namespace L9HLL.Launcher.Services
             _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
             _timer.Tick += OnTick;
             _timer.Start();
+
+            _restoreWatcher = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+            _restoreWatcher.Tick += OnRestoreWatcherTick;
+            _restoreWatcher.Start();
+        }
+
+        private bool _restoreErrorReported;
+
+        private void OnRestoreWatcherTick(object? sender, EventArgs e)
+        {
+            try
+            {
+                var error = _settingsGuard.TryRestoreIfIdle();
+                if (error != null && !_restoreErrorReported)
+                {
+                    _restoreErrorReported = true;
+                    UpdateStatus($"Settings restore problem: {error}");
+                }
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
+        }
+
+        private async void RestoreAfterClose()
+        {
+            try
+            {
+                for (int i = 0; i < 15; i++)
+                {
+                    if (!_settingsGuard.IsSeededProfileActive) return;
+                    _settingsGuard.TryRestoreIfIdle();
+                    await Task.Delay(1000);
+                }
+                if (_settingsGuard.IsSeededProfileActive)
+                {
+                    var error = _settingsGuard.Restore();
+                    if (error != null)
+                        UpdateStatus(error);
+                }
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+            }
         }
 
         public void ResetTrigger()
@@ -120,26 +170,14 @@ namespace L9HLL.Launcher.Services
                     Port = 7777,
                     Game = "hll"
                 };
-                var server2Info = new ServerInfo
-                {
-                    Name = "[L9] The Loyal Nine |#2|",
-                    Ip = "40.27.41.9",
-                    Port = 7777,
-                    Game = "hll"
-                };
 
                 var (r1, _) = await _queryService.QueryAsync(server1Info);
-                var (r2, _) = await _queryService.QueryAsync(server2Info);
 
                 ServerStatus server;
 
                 if (r1.IsOnline && r1.PlayerCount < 60)
                 {
                     server = r1;
-                }
-                else if (r2.IsOnline)
-                {
-                    server = r2;
                 }
                 else
                 {
@@ -189,6 +227,7 @@ namespace L9HLL.Launcher.Services
                             Game = server.Game
                         };
                         _seededDialogShown = false;
+                        _settingsGuard.BackupAndApply(server.Game);
                         StartSeedingMonitor();
                         _launchService.LaunchServer(server, autoTeam: true);
                     }
@@ -276,6 +315,7 @@ namespace L9HLL.Launcher.Services
                             {
                                 UpdateStatus("Seeding timer expired. Closing game.");
                                 _launchService.CloseGame();
+                                RestoreAfterClose();
                             }
                             else
                             {
@@ -298,6 +338,7 @@ namespace L9HLL.Launcher.Services
         {
             _timer.Stop();
             _monitorTimer?.Stop();
+            _restoreWatcher?.Stop();
         }
     }
 }

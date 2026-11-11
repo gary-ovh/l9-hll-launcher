@@ -20,6 +20,7 @@ namespace L9HLL.Launcher
         private readonly ServerQueryService _queryService = new();
         private readonly ConfigService _configService = new();
         private readonly LaunchService _launchService = new();
+        private readonly SettingsGuardService _settingsGuard = new();
         private DiscordService? _discordService;
         private Timer? _refreshTimer;
         private readonly Dispatcher _dispatcher;
@@ -29,6 +30,7 @@ namespace L9HLL.Launcher
         public ConfigService ConfigService => _configService;
         public ServerQueryService QueryService => _queryService;
         public LaunchService LaunchService => _launchService;
+        public SettingsGuardService SettingsGuard => _settingsGuard;
         public UpdateService? UpdateService => _updateService;
         public AutoLaunchService? AutoLaunchService => _autoLaunchService;
 
@@ -118,7 +120,7 @@ namespace L9HLL.Launcher
             SyncStartupSetting();
 
             _autoLaunchService = new AutoLaunchService(
-                _launchService, _queryService, _configService,
+                _launchService, _queryService, _configService, _settingsGuard,
                 s => _dispatcher.Invoke(() => StatusText = s));
 
             _updateService = new UpdateService(_configService, s => _dispatcher.Invoke(() => StatusText = s));

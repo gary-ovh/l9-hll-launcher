@@ -1,10 +1,12 @@
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using L9HLL.Launcher.Services;
 
 namespace L9HLL.Launcher
@@ -13,6 +15,8 @@ namespace L9HLL.Launcher
     {
         private TrayService? _trayService;
         private bool _isHiding;
+        private DispatcherTimer? _profileTimer;
+        private bool _stopRestoreBusy;
 
         public MainWindow()
         {
@@ -27,6 +31,16 @@ namespace L9HLL.Launcher
             App.Current.Exit += OnAppExit;
 
             SetIconFromResource();
+
+            var guard = viewModel.SettingsGuard;
+            _profileTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+            _profileTimer.Tick += (s, e) =>
+            {
+                bool active = guard.IsSeededProfileActive;
+                if (StopRestoreBtn.Visibility != (active ? Visibility.Visible : Visibility.Collapsed))
+                    StopRestoreBtn.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+            };
+            _profileTimer.Start();
 
             Loaded += (s, e) =>
             {
@@ -107,6 +121,51 @@ namespace L9HLL.Launcher
         {
             if (DataContext is MainViewModel vm)
                 vm.ToggleSettingsCommand.Execute(null);
+        }
+
+        private async void StopRestoreBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_stopRestoreBusy) return;
+            if (DataContext is not MainViewModel vm) return;
+
+            _stopRestoreBusy = true;
+            StopRestoreBtn.IsEnabled = false;
+            StopRestoreBtn.Content = "Closing game...";
+
+            try
+            {
+                vm.LaunchService.CloseGame();
+                for (int i = 0; i < 30 && vm.SettingsGuard.IsSeededProfileActive; i++)
+                {
+                    await Task.Delay(1000);
+                    vm.SettingsGuard.TryRestoreIfIdle();
+                    StopRestoreBtn.Content = "Waiting for game to exit...";
+                }
+
+                string? error = vm.SettingsGuard.IsSeededProfileActive
+                    ? vm.SettingsGuard.Restore()
+                    : null;
+
+                if (error != null)
+                {
+                    MessageBox.Show(error, "Settings Restore", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                else
+                {
+                    MessageBox.Show("Game stopped and your settings have been restored.", "Settings Restored",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                ConfigService.LogError(ex);
+                MessageBox.Show($"Restore failed: {ex.Message}", "Settings Restore", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                _stopRestoreBusy = false;
+                StopRestoreBtn.IsEnabled = true;
+            }
         }
 
         private void SettingsBtn_MouseEnter(object sender, MouseEventArgs e)

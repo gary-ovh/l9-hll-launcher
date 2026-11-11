@@ -49,6 +49,10 @@
                             Command="{Binding ToggleAutoLaunchCommand}"/>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
+                        <Button x:Name="StopRestoreBtn" Content="Stop &amp; Restore Settings" Width="Auto" Height="24" Padding="8,0" FontSize="11"
+                                Background="#5a3a1a" Foreground="#ffd27f" BorderBrush="#8a5a2a" BorderThickness="1"
+                                Cursor="Hand" Visibility="Collapsed" Click="StopRestoreBtn_Click"
+                                Margin="0,0,8,0"/>
                         <Button x:Name="SettingsBtn" Content="Settings" Width="Auto" Height="24" Padding="8,0" FontSize="11"
                                 Background="Transparent" Foreground="#aaa" BorderBrush="Transparent"
                                 Cursor="Hand" Click="SettingsBtn_Click"
