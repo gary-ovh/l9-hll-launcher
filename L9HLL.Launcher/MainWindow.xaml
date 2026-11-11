@@ -88,7 +88,7 @@
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,16">
                         <TextBlock Text="Game:" FontSize="12" Foreground="#aaa" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <ComboBox x:Name="GameSelector"
-                                  SelectedValue="{Binding SelectedGame}"
+                                  SelectedItem="{Binding SelectedGame}"
                                   ItemsSource="{Binding GameOptions}"
                                   Width="160"
                                   Style="{StaticResource GameCombo}"
@@ -130,6 +130,7 @@
                                         <Button Grid.Column="2"
                                                 Content="JOIN"
                                                 Style="{StaticResource JoinButton}"
+                                                Margin="20,0,0,0"
                                                 Command="{Binding DataContext.LaunchCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}"/>
                                     </Grid>

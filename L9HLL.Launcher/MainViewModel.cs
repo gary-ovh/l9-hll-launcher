@@ -88,14 +88,14 @@ namespace L9HLL.Launcher
         public ICommand ToggleAutoLaunchCommand { get; }
         public ICommand ToggleSettingsCommand { get; }
 
-        private string _selectedGame = "all";
+        private string _selectedGame = "All";
         public string SelectedGame
         {
             get => _selectedGame;
             set { _selectedGame = value; OnPropertyChanged(); FilterServers(); }
         }
 
-        public string[] GameOptions { get; } = { "All", "WW2", "Vietnam", "Wardogs" };
+        public string[] GameOptions { get; } = { "All", "WW2", "Wardogs" };
 
         private List<ServerInfo> _serverInfos = new();
         private List<ServerStatus> _allServers = new();
